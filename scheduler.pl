@@ -109,3 +109,55 @@ minify_s(ID, P, OD) :-
 %  but with the property identified by Key copied from SrcDict
 copyprop(S, K, ID, OD) :-
   OD = ID.put(K, S.get(K)).
+  
+  
+  
+  
+  
+Some ideas I've added.  
+  
+%activity(Type, Name). 
+activity("Sport", "Hockey").
+activity("Sport", "Football").
+activity("Sport", "Volleyball").
+
+%section(Name, SecCode, Date, Start_Time, End_Time).
+section("Hockey", "Hockey 100", 5, 4, 6).
+section("Hockey", "Hockey 200", 6, 4, 6).
+section("Football", "Football 200", 5, 5, 6).
+section("Football", "Football 300", 6, 7, 8).
+section("Volleyball", "Volleyball 300", 5, 5, 6).
+section("Soccer", "Soccer 300", 5, 5, 6).
+
+% Checks that the activities exist
+valid_activities([]).
+valid_activities([Name|T]) :- activity(_, Name), valid_activities(T).
+
+% Is true if the list does not contain redundant elements
+set([]).
+set([E|T]) :-
+   maplist(dif(E), T),
+   set(T).
+
+
+% This is true of a list of activities matches to a list of sections
+match([],[]).
+match([Activity|T1], [Section|T2]) :- activity(_, Activity), section(Activity, Section, _, _, _), match(T1,T2).
+
+
+% Checks for conflicts in a list of sections
+conflicts([S1,S2|_]) :- conflicts(S1, S2).
+conflicts([S1,_|T]) :- conflicts([S1|T]).
+conflicts([_,S2|T]) :- conflicts([S2|T]).
+
+% Checks if 2 sections conflict
+% This is a very rudimentary check
+conflicts(S1, S2) :- section(_, S1, Date1, Start1, _), section(_, S2, Date2, Start2, End2),  Date1 == Date2, End2 > Start1, Start1 >= Start2. 
+conflicts(S1, S2) :- section(_, S1, Date1, Start1, End1), section(_, S2, Date2, Start2, _),  Date1 == Date2, End1 > Start2, Start2 >= Start1.  
+
+
+% This outputs a schedule that avoids conflicts if such a schedule exists. Unfortunately, this leads to an infinite loop? if no such schedule exists.
+% This is a rough draft so please feel free to modify this! If this seems ok, we can try to modify/merge it with the activity function you wrote above that has the weather constraints. 
+schedule([], _) :- writeln("No activity selected"), !, fail.
+schedule(Activities, Sections) :- valid_activities(Activities), set(Activities), set(Sections), match(Activities, Sections), \+ conflicts(Sections).
+  
