@@ -114,7 +114,7 @@ copyprop(S, K, ID, OD) :-
   
   
   
-Some ideas I've added.  
+% Some ideas I've added. I've added another version of activity to test some stuff so maybe we can merge the two versions together.  
   
 %activity(Type, Name). 
 activity("Sport", "Hockey").
