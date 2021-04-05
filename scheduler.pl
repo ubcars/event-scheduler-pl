@@ -124,10 +124,10 @@ activity("Sport", "Volleyball").
 %section(Name, SecCode, Date, Start_Time, End_Time).
 section("Hockey", "Hockey 100", 5, 4, 6).
 section("Hockey", "Hockey 200", 6, 4, 6).
-section("Football", "Football 200", 5, 5, 6).
-section("Football", "Football 300", 6, 7, 8).
-section("Volleyball", "Volleyball 300", 5, 5, 6).
-section("Soccer", "Soccer 300", 5, 5, 6).
+section("Football", "Football 100", 5, 5, 6).
+section("Football", "Football 200", 6, 7, 8).
+section("Volleyball", "Volleyball 100", 5, 5, 6).
+section("Soccer", "Soccer 100", 5, 5, 6).
 
 % Checks that the activities exist
 valid_activities([]).
@@ -157,7 +157,8 @@ conflicts(S1, S2) :- section(_, S1, Date1, Start1, End1), section(_, S2, Date2, 
 
 
 % This outputs a schedule that avoids conflicts if such a schedule exists. Unfortunately, this leads to an infinite loop? if no such schedule exists.
-% This is a rough draft so please feel free to modify this! If this seems ok, we can try to modify/merge it with the activity function you wrote above that has the weather constraints. 
+% This is a rough draft so please feel free to modify this! If this seems ok, we can try to modify/merge it with the activity function you wrote above that has the weather constraints.
+% For example, schedule(["Hockey", "Football"], S). outputs S = ["Hockey 100", "Football 200"] ; S = ["Hockey 200", "Football 100"] ; S = ["Hockey 200", "Football 200"] ; infinite loop. 
 schedule([], _) :- writeln("No activity selected"), !, fail.
 schedule(Activities, Sections) :- valid_activities(Activities), set(Activities), set(Sections), match(Activities, Sections), \+ conflicts(Sections).
   
