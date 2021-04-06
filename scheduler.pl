@@ -193,5 +193,5 @@ weather(2, [5,10], [6,11], [7,13], [1,4]).
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5]).     Output: Sections = ["Hockey 200", "Football 200"]
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [3]).     Output: Sections = ["Hockey 100", "Football 200"]; Sections = ["Hockey 100", "Football 100"]
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [6]).     Output: Sections = ["Hockey 100", "Football 100"]
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5,6]).   Output: falsets(Sections).
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5,6]).   Output: false
   
