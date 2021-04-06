@@ -114,51 +114,84 @@ copyprop(S, K, ID, OD) :-
   
   
   
-% Some ideas I've added. I've added another version of activity to test some stuff so maybe we can merge the two versions together.  
+% Some ideas I've added. 
   
-%activity(Type, Name). 
-activity("Sport", "Hockey").
-activity("Sport", "Football").
-activity("Sport", "Volleyball").
 
-%section(Name, SecCode, Date, Start_Time, End_Time).
-section("Hockey", "Hockey 100", 5, 4, 6).
-section("Hockey", "Hockey 200", 6, 4, 6).
-section("Football", "Football 100", 5, 5, 6).
-section("Football", "Football 200", 6, 7, 8).
-section("Volleyball", "Volleyball 100", 5, 5, 6).
-section("Soccer", "Soccer 100", 5, 5, 6).
-
-% Checks that the activities exist
-valid_activities([]).
-valid_activities([Name|T]) :- activity(_, Name), valid_activities(T).
-
-% Is true if the list does not contain redundant elements
-set([]).
-set([E|T]) :-
-   maplist(dif(E), T),
-   set(T).
-
-
-% This is true of a list of activities matches to a list of sections
-match([],[]).
-match([Activity|T1], [Section|T2]) :- activity(_, Activity), section(Activity, Section, _, _, _), match(T1,T2).
-
-
-% Checks for conflicts in a list of sections
+% Checks for conflicts within a list of sections
 conflicts([S1,S2|_]) :- conflicts(S1, S2).
 conflicts([S1,_|T]) :- conflicts([S1|T]).
 conflicts([_,S2|T]) :- conflicts([S2|T]).
 
-% Checks if 2 sections conflict
+% Checks if two sections conflict
 % This is a very rudimentary check
 conflicts(S1, S2) :- section(_, S1, Date1, Start1, _), section(_, S2, Date2, Start2, End2),  Date1 == Date2, End2 > Start1, Start1 >= Start2. 
 conflicts(S1, S2) :- section(_, S1, Date1, Start1, End1), section(_, S2, Date2, Start2, _),  Date1 == Date2, End1 > Start2, Start2 >= Start1.  
 
 
-% This outputs a schedule that avoids conflicts if such a schedule exists. Unfortunately, this leads to an infinite loop? if no such schedule exists.
-% This is a rough draft so please feel free to modify this! If this seems ok, we can try to modify/merge it with the activity function you wrote above that has the weather constraints.
-% For example, schedule(["Hockey", "Football"], S). outputs S = ["Hockey 100", "Football 200"] ; S = ["Hockey 200", "Football 100"] ; S = ["Hockey 200", "Football 200"] ; infinite loop. 
+% filters a list of sections by a list of days
+filterDays(_,[]).
+filterDays(S, [D|T]) :- filterDay(S, D), filterDays(S, T).
+
+% inputs a list of sections and a day to be filtered
+filterDay([], _).
+filterDay([S|T], Day) :- section(_, S, D, _, _), dif(D, Day), filterDay(T, Day).
+
+
+% Filters out sections that are not suitable based on the weather each day
+filterWeathers([], _, _).
+filterWeathers([W|T], A, S) :- filterWeather(W, A, S), filterWeathers(T, A, S).
+
+% Determines available sections based on a day's weather 
+filterWeather(_, [], []).
+filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip),[Activity|R1],[Section|R2]) :- section(Activity, Section, Day2, _, _), dif(Day1, Day2), filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip), R1, R2).
+filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), [Activity|R1], [Section|R2]) :- activity(_, Activity, [Po1,Po2], [T1,T2], [W1,W2], [Pr1,Pr2]), section(Activity, Section, Day, _, _), Pop >= Po1, Po2 >= Pop, Temp >= T1, T2 >= Temp, Wind_spd >= W1, W2 >= Wind_spd, Precip >= Pr1, Pr2 >= Precip, filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), R1, R2).   
+
+
+% Outputs an optimal schedule based on constraints.
+% So far the constrains include weather and user selected days.
 schedule([], _) :- writeln("No activity selected"), !, fail.
-schedule(Activities, Sections) :- valid_activities(Activities), set(Activities), set(Sections), match(Activities, Sections), \+ conflicts(Sections).
+schedule(Weather, Activities, Sections, Days) :- filterWeathers(Weather, Activities, Sections), filterDays(Sections, Days), \+ conflicts(Sections).
+
+
+
+% Facts
+
+% activity(Type, Name, Pop, Temp, Wind_spd, Precip). 
+activity("Sport", "Hockey", [5,10], [5,10], [5,10], [5,10]).
+activity("Sport", "Football", [1,10], [1,10], [1,10], [1,10]).
+activity("Sport", "Volleyball", [5,10], [5,10], [5,10], [5,10]).
+
+% section(Name, SecCode, Date, Start_Time, End_Time).
+section("Hockey", "Hockey 100", 5, 4, 6).
+section("Hockey", "Hockey 200", 6, 4, 6).
+section("Football", "Football 100", 5, 6, 7).
+section("Football", "Football 200", 6, 7, 8).
+section("Volleyball", "Volleyball 100", 5, 5, 6).
+section("Soccer", "Soccer 100", 5, 5, 6).
+
+% weather(Day, Pop, Temp, Wind_spd, Precip).
+weather(1, [5,10], [6,11], [7,13], [1,4]).
+weather(1, [3,8], [4,15], [9,13], [1,4]).
+weather(2, [5,10], [6,11], [7,13], [1,4]).
+
+
+
+% Tests
+
+% conflicts(["Hockey 100", "Football 200"]). 	            Output: false
+% conflicts(["Hockey 100", "Volleyball 100"]). 	          Output: true
+
+% filterDays(["Hockey 100", "Football 200"], [5, 6]).     Output: false
+% filterDays(["Hockey 200", "Football 100"], [4, 6]).     Output: false
+% filterDays(["Hockey 100", "Football 100"], [4, 6]).     Output: true  
+ 
+% filterWeathers([weather(4, 5, 5, 5, 5), weather(4, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: S = ["Hockey 100", "Football 100"]; S = ["Hockey 100", "Football 200"] ; S = ["Hockey 200", "Football 100"]; S = ["Hockey 200", "Football 200"] 
+% filterWeathers([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"] 
+% filterWeathers([weather(5, 5, 3, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: false
+
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [4,7]).   Output: S = ["Hockey 200", "Football 200"]; S = ["Hockey 200", "Football 100"] ; S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"]
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5]).     Output: Sections = ["Hockey 200", "Football 200"]
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [3]).     Output: Sections = ["Hockey 100", "Football 200"]; Sections = ["Hockey 100", "Football 100"]
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [6]).     Output: Sections = ["Hockey 100", "Football 100"]
+% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5,6]).   Output: falsets(Sections).
   
