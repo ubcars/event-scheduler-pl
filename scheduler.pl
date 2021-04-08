@@ -114,44 +114,58 @@ copyprop(S, K, ID, OD) :-
   
   
   
-% Some ideas I've added. 
+% Some ideas I've added, including new facts for activity. 
   
 
-% Checks for conflicts within a list of sections
+% Checks for conflicts with a list of sections
+% True if there is no conflict
 conflicts([S1,S2|_]) :- conflicts(S1, S2).
 conflicts([S1,_|T]) :- conflicts([S1|T]).
 conflicts([_,S2|T]) :- conflicts([S2|T]).
 
-% Checks if two sections conflict
+% Checks if two sections have a conflict
+% True if S1 and S2 have no conflict
 % This is a very rudimentary check
 conflicts(S1, S2) :- section(_, S1, Date1, Start1, _), section(_, S2, Date2, Start2, End2),  Date1 == Date2, End2 > Start1, Start1 >= Start2. 
 conflicts(S1, S2) :- section(_, S1, Date1, Start1, End1), section(_, S2, Date2, Start2, _),  Date1 == Date2, End1 > Start2, Start2 >= Start1.  
 
-
-% filters a list of sections by a list of days
+% Filters a list of sections by a list of days
+% True if the sections do not occur on any of the days to be filtered
 filterDays(_,[]).
 filterDays(S, [D|T]) :- filterDay(S, D), filterDays(S, T).
 
-% inputs a list of sections and a day to be filtered
+% Inputs a list of sections and a day to be filtered
+% True if the sections do not occur on Day
 filterDay([], _).
 filterDay([S|T], Day) :- section(_, S, D, _, _), dif(D, Day), filterDay(T, Day).
 
-
 % Filters out sections that are not suitable based on the weather each day
+% True if S contains only suitable sections
 filterWeathers([], _, _).
 filterWeathers([W|T], A, S) :- filterWeather(W, A, S), filterWeathers(T, A, S).
 
 % Determines available sections based on a day's weather 
+% True if only suitable sections remain
 filterWeather(_, [], []).
 filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip),[Activity|R1],[Section|R2]) :- section(Activity, Section, Day2, _, _), dif(Day1, Day2), filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip), R1, R2).
 filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), [Activity|R1], [Section|R2]) :- activity(_, Activity, [Po1,Po2], [T1,T2], [W1,W2], [Pr1,Pr2]), section(Activity, Section, Day, _, _), Pop >= Po1, Po2 >= Pop, Temp >= T1, T2 >= Temp, Wind_spd >= W1, W2 >= Wind_spd, Precip >= Pr1, Pr2 >= Precip, filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), R1, R2).   
 
-
-% Outputs an optimal schedule based on constraints.
-% So far the constrains include weather and user selected days.
+% Sections is true if it is a schedule that satisfies all constraints
+% So far the constrains include weather and days selected by the user
 schedule([], _) :- writeln("No activity selected"), !, fail.
 schedule(Weather, Activities, Sections, Days) :- filterWeathers(Weather, Activities, Sections), filterDays(Sections, Days), \+ conflicts(Sections).
 
+% List is true if it contains all valid schedules (schedules that satisfy all constraints)
+all(Weather, Activities, Days, List) :- findall(Sections, schedule(Weather, Activities, Sections, Days), List).
+
+% Min is true if it is the schedule with the minimum total time commitment
+findMin([Min], Min).
+findMin([H,K|T], Min) :- sum(H,S1), sum(K,S2), S1 =< S2, findMin([H|T], Min).
+findMin([H,K|T], Min) :- sum(H,S1), sum(K,S2), S1 > S2, findMin([K|T], Min).
+
+% S is true if it is the total time of the sections
+sum([],0).
+sum([H|T],S) :- sum(T,ST), section(_, H, _, Start, End), S is End-Start+ST. 
 
 
 % Facts
@@ -160,19 +174,20 @@ schedule(Weather, Activities, Sections, Days) :- filterWeathers(Weather, Activit
 activity("Sport", "Hockey", [5,10], [5,10], [5,10], [5,10]).
 activity("Sport", "Football", [1,10], [1,10], [1,10], [1,10]).
 activity("Sport", "Volleyball", [5,10], [5,10], [5,10], [5,10]).
+activity("Sport", "Soccer", [5,10], [5,10], [5,10], [5,10]).
 
 % section(Name, SecCode, Date, Start_Time, End_Time).
-section("Hockey", "Hockey 100", 5, 4, 6).
+section("Hockey", "Hockey 100", 5, 3, 6).
 section("Hockey", "Hockey 200", 6, 4, 6).
 section("Football", "Football 100", 5, 6, 7).
-section("Football", "Football 200", 6, 7, 8).
+section("Football", "Football 200", 6, 7, 9).
 section("Volleyball", "Volleyball 100", 5, 5, 6).
 section("Soccer", "Soccer 100", 5, 5, 6).
 
 % weather(Day, Pop, Temp, Wind_spd, Precip).
-weather(1, [5,10], [6,11], [7,13], [1,4]).
-weather(1, [3,8], [4,15], [9,13], [1,4]).
-weather(2, [5,10], [6,11], [7,13], [1,4]).
+weather(1, 5, 6, 7, 8).
+weather(1, 4, 3, 2, 1).
+weather(2, 13, -35, 77, 5).
 
 
 
@@ -194,4 +209,10 @@ weather(2, [5,10], [6,11], [7,13], [1,4]).
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [3]).     Output: Sections = ["Hockey 100", "Football 200"]; Sections = ["Hockey 100", "Football 100"]
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [6]).     Output: Sections = ["Hockey 100", "Football 100"]
 % schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5,6]).   Output: false
+
+% all([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], [4,7], List).  Output: List = [["Hockey 200", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 100", "Football 100"]]
+
+% sum(["Hockey 200", "Football 200"], Sum).   Output: Sum = 4
+
+% findMin([["Hockey 100", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 200", "Football 200"]], Min).    Output: Min = ["Hockey 200", "Football 100"]
   
