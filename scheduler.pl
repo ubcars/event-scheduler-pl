@@ -165,7 +165,7 @@ section_duration(SectionCode, Duration) :-
 % April 9 update: added schedule2 which outputs a list of recommended schedules based on the user's preferences. 
 % Each schedule contains the maximum possible number of activities while satisfying the (maximum) time constraint and other constraints specified by the user. 
 % schedule2(weather, time constraint, list of (N,T) where N is the minimum number of T type activity required, list of minimum activities required, list of schedules outputted)  
-% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, Sport), (1, Leisure)], [hockey, football, volleyball], Schedules).   
+% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], Schedules).   
 
 
 % True if the schedule contains all desired activities 
@@ -284,16 +284,16 @@ schedule2(W, T, Types, Activities, Schedules) :-
 
 % activity(Type, Name, Pop, Precip, Temp, WindSpd) is an activity with a Type and Name, where
 %  Pop, Temp, WindSpd, Precip are pairs of [min, max] values for each weather parameter
-activity(Sport, hockey,     (5,10), (5,10), (5,10), (5,10)).
-activity(Sport, football,   (1,10), (1,10), (1,10), (1,10)).
-activity(Sport, volleyball, (5,10), (5,10), (5,10), (5,10)).
-activity(Sport, soccer,     (5,10), (5,10), (5,10), (5,10)).
+activity(sport, hockey,     (5,10), (5,10), (5,10), (5,10)).
+activity(sport, football,   (1,10), (1,10), (1,10), (1,10)).
+activity(sport, volleyball, (5,10), (5,10), (5,10), (5,10)).
+activity(sport, soccer,     (5,10), (5,10), (5,10), (5,10)).
 % Examples with somewhat realistic weather conditions
-activity(Sport, indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
-activity(Sport, outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
-activity(Sport, beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
-activity(Leisure, sleep, (0,100), (0,1000), (-100,100), (0,100)).
-activity(Leisure, picnic, (0,5), (0,1), (5,25), (0,1)).
+activity(sport, indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
+activity(sport, outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
+activity(sport, beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
+activity(leisure, sleep, (0,100), (0,1000), (-100,100), (0,100)).
+activity(leisure, picnic, (0,5), (0,1), (5,25), (0,1)).
 
 % section(ActivityName, SectionCode, Day, StartTime, EndTime) is a schedulable section for activity ActivityName,
 %  where the section has a unique SectionCode, is Day days into the future, and starts at StartTime and ends at EndTime on that day
