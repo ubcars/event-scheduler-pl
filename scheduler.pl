@@ -5,10 +5,11 @@
 :- use_module(library(http/json)).
 
 % Query for a schedule from interface
-ischedule(Schedule) :-
-  write("Enter list of participants, separated by spaces: "),
+ischedule(Days, Activities, Forecast, Schedule) :- % TODO: Use this line for debugging; remove line when we finish project
+% ischedule(Schedule) :-
+  write("Enter list of available days, in the form of days into the future (e.g. today is 0, tomorrow is 1), separated by spaces: "),
   flush_output(current_output),
-  readln(Participants),
+  readln(Days),
   write("Enter list of activities, separated by spaces: "),
   flush_output(current_output),
   readln(Activities),
@@ -16,61 +17,17 @@ ischedule(Schedule) :-
   flush_output(current_output),
   readln(LocationInput),
   atomic_list_concat(LocationInput, '+', Location),
-%  write("Enter how many days into the future you would like to schedule events (max 16): "),
-%  flush_output(current_output),
-%  readln(Days),
-  schedule(Participants, Activities, Location, Schedule).
+  forecast(Location, Forecast),
+  schedule(Days, Activities, Forecast, Schedule).
 
-% schedule(Participants, Activities, Location, S) gives an optimal schedule S for Participants to take part in Activities at Location
-% TODO: schedule(P, A, L, S) :- ...
-% Calling ischedule(S) currently fails here, as expected, with 'Unknown procedure: schedule/4'
+% forecast(Location, Forecast) is true if Forecast is the weather forecast for Location
+forecast(Location, Forecast) :-
+  api_key(Key),
+  atomic_list_concat(['https://api.weatherbit.io/v2.0/forecast/daily?', 'city=', Location, '&key=', Key], Url),
+  http_get(Url, RawForecast, [json_object(dict)]),
+  weather_objs_to_terms(RawForecast.data, Forecast).
 
-
-% available(P, [0,1,...]) is true if person P is busy tomorrow, available the day after tomorrow, etc.
-available(aa, [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]).
-available(bb, [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]).
-available(cc, [0,1,1,0,1,1,1,0,0,1,1,1,0,1,1,0]).
-available(dd, [0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1]).
-
-% activity(A,C) is true if A is an activity with weather constraints C
-activity(bbq,    [lt(pop, 5), gt(temp, 15), lt(wind_spd, 5)]).
-activity(beach,  [lt(pop, 5), gt(temp, 15), lt(wind_spd, 10)]).
-activity(camp,   [lt(precip, 10), gt(temp, 10), lt(wind_spd, 10)]).
-activity(dinner, []).
-activity(ski,    [lt(temp, 5), lt(wind_spd, 15)]).
-
-
-/* TODO: Please read
-Everything *above* here is incomplete.
-The stuff you see is just the result of my brainstorming.
-I do not know if available() or activity() will be useful at all; I think that's going to depend
- on how we implement the schedule predicate.
-Some points I want to discuss:
-- I called the things to schedule 'activities' because after thinking through it, I felt an 'activity'
- is more influenced by the weather than an 'event' is. Your thoughts?
-- I think I like the idea of defining the constraints that each activity has (like I have defined here),
- then asking the user via an interface (in ischedule()) for the list of activities they would like to
- schedule (so that not all activities have to always be scheduled). I don't think this would make
- the app any more complex to implement, but it feels like a nice-to-have from a user's perspective.
-
-Everything *below* here works fine IMO.
-This part takes care of the fetching and cleaning up of the data we get from the Weatherbit API.
-By calling forecast(L,F), the app is able to fetch forecast F for location L from Weatherbit's 16-day forecast API.
-I was playing around in the command line to get this to work, so I wrote some predicates to minify
- the response object (so that, you know, my terminal doesn't get too cluttered).
- I don't know yet if we'll need them when implementing the actual scheduling, but it's there for now.
- You can try forecast("New+York", F) to see what I mean. F should be a list of objects, where
- each object only contains the properties we are interested in.
-*/
-
-% forecast(Location, Forecast) is true if Forecast is the minified weather forecast for Location
-forecast(L, MinF) :-
-  api_key(K),
-  atomic_list_concat(['https://api.weatherbit.io/v2.0/forecast/daily?', 'city=', L, '&key=', K], Url),
-  http_get(Url, RawF, [json_object(dict)]),
-  minify_l(RawF.data, prop, MinF).
-
-% api_key(K) retrieves Weatherbit API key from config.json
+% api_key(Key) retrieves Weatherbit API Key from config.json
 api_key(K) :-
   open('config.json', read, Stream),
   json_read_dict(Stream, Config),
@@ -78,141 +35,193 @@ api_key(K) :-
   K = Config.get('key').
 
 /*
-Relevant weather parameters
-- pop:      probability of precipitation, in %
-- precip:   amount of precipitation, in mm
-- temp:     average temperature, in degrees Celsius
-- wind_spd: wind speed, in m/s
+weather(Day, Pop, Precip, Temp, WindSpd) represents the forecast for the Day-th day into the future,
+i.e. weather(0, ...) represents today's forecasted weather, weather(1, ...) represents tomorrow's, etc.
+
+The remaining parameters directly correspond to parameters of the same name returned by Weatherbit's API
+- Pop:     probability of precipitation, in %
+- Precip:  amount of precipitation, in mm
+           (0: no precipitation; 40: day with heaviest Vancouver rainfall in a typical year)
+- Temp:    average temperature, in degrees Celsius
+- WindSpd: wind speed, in m/s
+           (0: no wind; 10: small trees sway; 20: very difficult to walk against wind)
 */
-% prop(P) is true if P is a valid weather property used in the app's weather constraints
-% Property names should correspond to those returned by Weatherbit's weather forecast API
-prop(pop).
-prop(precip).
-prop(temp).
-prop(wind_spd).
 
-% minify_l(SrcList, PickBy, OutList) is true if list of dicts OutList is InList
-%  but with each dict containing only the properties satisfying the PickBy predicate
-minify_l([], _, []).
-minify_l([IH|IT], P, [OH|OT]) :-
-  minify_s(IH, P, OH),
-  minify_l(IT, P, OT).
+% weather_objs_to_terms(WeatherObjects, WeatherTerms) is true if WeatherTerms is a list of terms of the form
+%  weather(Day, Pop, Precip, Temp, WindSpd), where the data for each term comes from each object in WeatherObjects
+weather_objs_to_terms(WeatherObjects, WeatherTerms) :- weather_objs_to_terms(WeatherObjects, 0, WeatherTerms).
 
-% minify_s(InDict, PickBy, OutDict) is true if dict OutDict is InDict
-%   but with only the properties satisfying the PickBy predicate
-minify_s(ID, P, OD) :-
-  dict_keys(ID, IKeys),
-  include(P, IKeys, OKeys),
-  foldl(copyprop(ID), OKeys, _{}, OD).
+% weather_objs_to_terms(WeatherObjects, Index, WeatherTerms) is true if WeatherTerms is a list of terms of the form
+%  weather(Day, Pop, Precip, Temp, WindSpd), where the data for each term comes from each object in WeatherObjects
+%  and Index is the Day number for the head of the two lists
+weather_objs_to_terms([], _, []).
+weather_objs_to_terms([OH|OT], Index, [TH|TT]) :-
+  weather_obj_to_term(OH, Index, TH),
+  NextIndex is Index+1,
+  weather_objs_to_terms(OT, NextIndex, TT).
 
-% copyprop(SrcDict, Key, InDict, OutDict) is true if dict OutDict is dict InDict
-%  but with the property identified by Key copied from SrcDict
-copyprop(S, K, ID, OD) :-
-  OD = ID.put(K, S.get(K)).
-  
-  
-  
-  
-  
-% Some ideas I've added, including new facts for activity. 
-  
+% weather_obj_to_term(WeatherObject, Day, weather(Day, Pop, Precip, Temp, WindSpd)) is true if weather(Day, Pop, Precip, Temp, WindSpd)
+%  is populated with the Day number and the remaining parameters are populated with the corresponding data from WeatherObject
+weather_obj_to_term(WeatherObject, Day, weather(Day, Pop, Precip, Temp, WindSpd)) :-
+  Pop     = WeatherObject.get(pop),
+  Precip  = WeatherObject.get(precip),
+  Temp    = WeatherObject.get(temp),
+  WindSpd = WeatherObject.get(wind_spd).
 
-% Checks for conflicts with a list of sections
-% True if there is no conflict
-conflicts([S1,S2|_]) :- conflicts(S1, S2).
-conflicts([S1,_|T]) :- conflicts([S1|T]).
-conflicts([_,S2|T]) :- conflicts([S2|T]).
+% conflicts_list(SectionsList) is true if there exists a conflict in list of sections SectionsList
+conflicts_list([S1, S2|_]) :- conflicts_pair(S1, S2).
+conflicts_list([S1, _|T]) :- conflicts_list([S1|T]).
+conflicts_list([_, S2|T]) :- conflicts_list([S2|T]).
 
-% Checks if two sections have a conflict
-% True if S1 and S2 have no conflict
+% conflicts_pair(Section1, Section2) is true if there exists a conflict between sections Section1 and Section2
 % This is a very rudimentary check
-conflicts(S1, S2) :- section(_, S1, Date1, Start1, _), section(_, S2, Date2, Start2, End2),  Date1 == Date2, End2 > Start1, Start1 >= Start2. 
-conflicts(S1, S2) :- section(_, S1, Date1, Start1, End1), section(_, S2, Date2, Start2, _),  Date1 == Date2, End1 > Start2, Start2 >= Start1.  
+conflicts_pair(S1, S2) :-
+  section(_, S1, Date1, Start1, _),
+  section(_, S2, Date2, Start2, End2),
+  Date1 == Date2,
+  End2 > Start1,
+  Start1 >= Start2.
+conflicts_pair(S1, S2) :-
+  section(_, S1, Date1, Start1, End1),
+  section(_, S2, Date2, Start2, _),
+  Date1 == Date2,
+  End1 > Start2,
+  Start2 >= Start1.
 
-% Filters a list of sections by a list of days
-% True if the sections do not occur on any of the days to be filtered
-filterDays(_,[]).
-filterDays(S, [D|T]) :- filterDay(S, D), filterDays(S, T).
+% sections_in_days(SectionCodes, Days) is true if every section identified by SectionCodes takes place on one of the Days
+sections_in_days([], _).
+sections_in_days([S|T], Days) :- section_in_days(S, Days), sections_in_days(T, Days).
 
-% Inputs a list of sections and a day to be filtered
-% True if the sections do not occur on Day
-filterDay([], _).
-filterDay([S|T], Day) :- section(_, S, D, _, _), dif(D, Day), filterDay(T, Day).
+% section_in_days(SectionCode, Days) is true if the section identified by SectionCode takes place on one of the Days
+section_in_days(SectionCode, Days) :-
+  section(_, SectionCode, Day, _, _),
+  member(Day, Days).
 
 % Filters out sections that are not suitable based on the weather each day
 % True if S contains only suitable sections
-filterWeathers([], _, _).
-filterWeathers([W|T], A, S) :- filterWeather(W, A, S), filterWeathers(T, A, S).
+filter_weathers([], _, _).
+filter_weathers([W|T], A, S) :- filter_weather(W, A, S), filter_weathers(T, A, S).
 
-% Determines available sections based on a day's weather 
+% Determines available sections based on a day's weather
 % True if only suitable sections remain
-filterWeather(_, [], []).
-filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip),[Activity|R1],[Section|R2]) :- section(Activity, Section, Day2, _, _), dif(Day1, Day2), filterWeather(weather(Day1, Pop, Temp, Wind_spd, Precip), R1, R2).
-filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), [Activity|R1], [Section|R2]) :- activity(_, Activity, [Po1,Po2], [T1,T2], [W1,W2], [Pr1,Pr2]), section(Activity, Section, Day, _, _), Pop >= Po1, Po2 >= Pop, Temp >= T1, T2 >= Temp, Wind_spd >= W1, W2 >= Wind_spd, Precip >= Pr1, Pr2 >= Precip, filterWeather(weather(Day, Pop, Temp, Wind_spd, Precip), R1, R2).   
+filter_weather(_, [], []).
+filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), [Activity|R1], [Section|R2]) :-
+  section(Activity, Section, Day2, _, _),
+  dif(Day1, Day2),
+  filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), R1, R2).
+filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|R1], [Section|R2]) :-
+  activity(_, Activity, (PopMin,PopMax), (PrecipMin,PrecipMax), (TempMin,TempMax), (WindSpdMin,WindSpdMax)),
+  section(Activity, Section, Day, _, _),
+  Pop    >= PopMin,
+  PopMax >= Pop,
+  Precip    >= PrecipMin,
+  PrecipMax >= Precip,
+  Temp    >= TempMin,
+  TempMax >= Temp,
+  WindSpd    >= WindSpdMin,
+  WindSpdMax >= WindSpd,
+  filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), R1, R2).
 
-% Sections is true if it is a schedule that satisfies all constraints
-% So far the constrains include weather and days selected by the user
-schedule([], _) :- writeln("No activity selected"), !, fail.
-schedule(Weather, Activities, Sections, Days) :- filterWeathers(Weather, Activities, Sections), filterDays(Sections, Days), \+ conflicts(Sections).
+% schedule(Days, Activities, Location, Schedule) is true if Schedule is a valid schedule for doing all Activities
+%  some time during the selected Days under the forecasted weather at Location
+% Note: There must exist a weather term in Weathers for each day in Days
+schedule(_, [], _, _) :- writeln("No activity selected"), !, fail.
+schedule(Days, Activities, Weathers, Sections) :-
+  filter_weathers(Weathers, Activities, Sections),
+  sections_in_days(Sections, Days),
+  \+ conflicts_list(Sections).
 
-% List is true if it contains all valid schedules (schedules that satisfy all constraints)
-all(Weather, Activities, Days, List) :- findall(Sections, schedule(Weather, Activities, Sections, Days), List).
+% list_schedules(Days, Activities, Weathers, Schedules) is true if Schedules is the list of all valid schedules (schedules that satisfy all constraints)
+%  which can be produced under the constraints given by Days, Activities, and Weather
+list_schedules(Days, Activities, Weathers, Schedules) :- findall(Sections, schedule(Days, Activities, Weathers, Sections), Schedules).
 
-% Min is true if it is the schedule with the minimum total time commitment
-findMin([Min], Min).
-findMin([H,K|T], Min) :- sum(H,S1), sum(K,S2), S1 =< S2, findMin([H|T], Min).
-findMin([H,K|T], Min) :- sum(H,S1), sum(K,S2), S1 > S2, findMin([K|T], Min).
+% find_min(Schedules, MinSchedule) is true if MinSchedule is the schedule with the minimum total time commitment
+find_min([Min], Min).
+find_min([H,K|T], Min) :-
+  sum(H,S1),
+  sum(K,S2),
+  S1 =< S2,
+  find_min([H|T], Min).
+find_min([H,K|T], Min) :-
+  sum(H,S1),
+  sum(K,S2),
+  S1 > S2,
+  find_min([K|T], Min).
 
-% S is true if it is the total time of the sections
-sum([],0).
-sum([H|T],S) :- sum(T,ST), section(_, H, _, Start, End), S is End-Start+ST. 
+% sum(SectionCodes, Duration) is true if the activities identified by SectionCodes spans a combined total of Duration hours
+sum([], 0).
+sum([H|T], S) :-
+  sum(T, ST),
+  section_duration(H, Duration),
+  S is Duration+ST.
 
-
-% Facts
-
-% activity(Type, Name, Pop, Temp, Wind_spd, Precip). 
-activity("Sport", "Hockey", [5,10], [5,10], [5,10], [5,10]).
-activity("Sport", "Football", [1,10], [1,10], [1,10], [1,10]).
-activity("Sport", "Volleyball", [5,10], [5,10], [5,10], [5,10]).
-activity("Sport", "Soccer", [5,10], [5,10], [5,10], [5,10]).
-
-% section(Name, SecCode, Date, Start_Time, End_Time).
-section("Hockey", "Hockey 100", 5, 3, 6).
-section("Hockey", "Hockey 200", 6, 4, 6).
-section("Football", "Football 100", 5, 6, 7).
-section("Football", "Football 200", 6, 7, 9).
-section("Volleyball", "Volleyball 100", 5, 5, 6).
-section("Soccer", "Soccer 100", 5, 5, 6).
-
-% weather(Day, Pop, Temp, Wind_spd, Precip).
-weather(1, 5, 6, 7, 8).
-weather(1, 4, 3, 2, 1).
-weather(2, 13, -35, 77, 5).
-
+% section_duration(SectionCode, Duration) is true if the activity section identified by SectionCode spans Duration hours
+section_duration(SectionCode, Duration) :-
+  section(_, SectionCode, _, StartTime, EndTime),
+  Duration is EndTime-StartTime.
 
 
-% Tests
+/* Facts */
 
-% conflicts(["Hockey 100", "Football 200"]). 	            Output: false
-% conflicts(["Hockey 100", "Volleyball 100"]). 	          Output: true
+% activity(Type, Name, Pop, Precip, Temp, WindSpd) is an activity with a Type and Name, where
+%  Pop, Temp, WindSpd, Precip are pairs of [min, max] values for each weather parameter
+activity("Sport", hockey,     (5,10), (5,10), (5,10), (5,10)).
+activity("Sport", football,   (1,10), (1,10), (1,10), (1,10)).
+activity("Sport", volleyball, (5,10), (5,10), (5,10), (5,10)).
+activity("Sport", soccer,     (5,10), (5,10), (5,10), (5,10)).
+% Examples with somewhat realistic weather conditions
+activity("Sport", indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
+activity("Sport", outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
+activity("Sport", beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
+activity("Sport", sleep, (0,100), (0,1000), (-100,100), (0,100)).
 
-% filterDays(["Hockey 100", "Football 200"], [5, 6]).     Output: false
-% filterDays(["Hockey 200", "Football 100"], [4, 6]).     Output: false
-% filterDays(["Hockey 100", "Football 100"], [4, 6]).     Output: true  
- 
-% filterWeathers([weather(4, 5, 5, 5, 5), weather(4, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: S = ["Hockey 100", "Football 100"]; S = ["Hockey 100", "Football 200"] ; S = ["Hockey 200", "Football 100"]; S = ["Hockey 200", "Football 200"] 
-% filterWeathers([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"] 
-% filterWeathers([weather(5, 5, 3, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], S).           Output: false
+% section(ActivityName, SectionCode, Day, StartTime, EndTime) is a schedulable section for activity ActivityName,
+%  where the section has a unique SectionCode, is Day days into the future, and starts at StartTime and ends at EndTime on that day
+% Note: the app produces garbage values when the Day is not in the scope of the forecast returned by the API
+section(hockey,     "Hockey 100",     5, 3, 6).
+section(hockey,     "Hockey 200",     6, 4, 6).
+section(football,   "Football 100",   5, 6, 7).
+section(football,   "Football 200",   6, 7, 9).
+section(volleyball, "Volleyball 100", 5, 5, 6).
+section(soccer,     "Soccer 100",     5, 5, 6).
+% Examples with somewhat realistic weather conditions
+section(indoor_ice_hockey, "Indoor Ice Hockey 0-13-14", 0, 13, 14).
+section(indoor_ice_hockey, "Indoor Ice Hockey 0-13-15", 0, 13, 15).
+section(beach_volleyball, "Beach Volleyball 0-14-15", 0, 14, 15).
+section(beach_volleyball, "Beach Volleyball 0-14-16", 0, 14, 16).
+section(sleep, "Sleep 0-0-23", 0, 0, 23).
+section(sleep, "Sleep 0-12-15", 0, 12, 15).
+section(sleep, "Sleep 1-0-1", 1, 0, 1).
+section(sleep, "Sleep 1-12-15", 1, 12, 15).
 
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [4,7]).   Output: S = ["Hockey 200", "Football 200"]; S = ["Hockey 200", "Football 100"] ; S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"]
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5]).     Output: Sections = ["Hockey 200", "Football 200"]
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [3]).     Output: Sections = ["Hockey 100", "Football 200"]; Sections = ["Hockey 100", "Football 100"]
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 3, 5, 5)], ["Hockey", "Football"], Sections, [6]).     Output: Sections = ["Hockey 100", "Football 100"]
-% schedule([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], Sections, [5,6]).   Output: false
 
-% all([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], ["Hockey", "Football"], [4,7], List).  Output: List = [["Hockey 200", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 100", "Football 100"]]
+/* Tests */
+
+% conflicts_list(["Hockey 100", "Football 200"]).     Output: false
+% conflicts_list(["Hockey 100", "Volleyball 100"]).   Output: true
+
+% sections_in_days(["Hockey 100"], []).                      Output: false
+% sections_in_days(["Hockey 100", "Football 100"], [4, 6]).  Output: false
+% sections_in_days(["Hockey 100", "Football 100"], [5, 6]).  Output: true
+% sections_in_days(["Hockey 100", "Football 200"], [5, 6]).  Output: true
+
+% filter_weathers([weather(5, 5, 5, 5, 4), weather(6, 5, 5, 5, 4)], [hockey, football], S).   Output: false
+% filter_weathers([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 4)], [hockey, football], S).   Output: S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"]
+% filter_weathers([weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], [hockey, football], S).   Output: S = ["Hockey 100", "Football 100"]; S = ["Hockey 100", "Football 200"]; S = ["Hockey 200", "Football 100"]; S = ["Hockey 200", "Football 200"]
+
+% schedule([5,6], [hockey, football], [weather(5, 5, 5, 5, 4), weather(6, 5, 5, 5, 4)], S).   Output: false
+% schedule([5,6], [hockey, football], [weather(5, 5, 5, 5, 4), weather(6, 5, 5, 5, 5)], S).   Output: S = ["Hockey 200", "Football 200"]; S = ["Hockey 200", "Football 100"]
+% schedule([5,6], [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S).   Output: S = ["Hockey 200", "Football 200"]; S = ["Hockey 200", "Football 100"]; S = ["Hockey 100", "Football 200"]; S = ["Hockey 100", "Football 100"]
+% schedule([5],   [hockey, football], [weather(5, 5, 5, 5, 4), weather(6, 5, 5, 5, 4)], S).   Output: false
+% schedule([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S).   Output: S = ["Hockey 100", "Football 100"]
+% schedule([6],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S).   Output: S = ["Hockey 200", "Football 200"]
+% schedule([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], S).                           Output: false
+% schedule([4,7], [hockey, football], [weather(4, 5, 5, 5, 5), weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5), weather(7, 5, 5, 5, 5)], S).   Output: false
+
+% list_schedules([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], Schedules).                           Output: false
+% list_schedules([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], Schedules).   Output: Schedules = [["Hockey 100", "Football 100"]]
+% list_schedules([5,6], [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], Schedules).   Output: Schedules = [["Hockey 200", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 100", "Football 100"]]
 
 % sum(["Hockey 200", "Football 200"], Sum).   Output: Sum = 4
 
-% findMin([["Hockey 100", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 200", "Football 200"]], Min).    Output: Min = ["Hockey 200", "Football 100"]
-  
+% find_min([["Hockey 100", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 200", "Football 200"]], Min).   Output: Min = ["Hockey 200", "Football 100"]
