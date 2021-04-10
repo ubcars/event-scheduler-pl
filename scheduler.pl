@@ -159,21 +159,141 @@ sum([H|T], S) :-
 section_duration(SectionCode, Duration) :-
   section(_, SectionCode, _, StartTime, EndTime),
   Duration is EndTime-StartTime.
+  
+  
+  
+% April 9 update: added schedule2 which outputs a list of recommended schedules based on the user's preferences. 
+% Each schedule contains the maximum possible number of activities while satisfying the (maximum) time constraint and other constraints specified by the user. 
+% schedule2(weather, time constraint, list of (N,T) where N is the minimum number of T type activity required, list of minimum activities required, list of schedules outputted)  
+% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, Sport), (1, Leisure)], [hockey, football, volleyball], Schedules).   
 
 
+% True if the schedule contains all desired activities 
+must_contain([], _).
+must_contain([Activity|T], Schedule) :- 
+  must_contain_helper(Activity, Schedule), 
+  must_contain(T, Schedule).
+
+must_contain_helper(_, []) :- 
+  false.
+must_contain_helper(Activity, [Section|_]) :- 
+  section(Activity, Section, _, _, _).
+must_contain_helper(Activity, [_|T]) :- 
+  must_contain_helper(Activity, T).
+
+% True if the schedule contains at least N activities of type C
+numeq([], _).
+numeq([(N, C)|T], S) :- 
+  numeq(N1, C, S), 
+  N1 >= N, 
+  numeq(T, S).
+
+numeq(0,_, []).
+numeq(N1, C, [H|T]) :- 
+  activity(C, A, _, _, _, _), 
+  section(A, H, _, _, _), 
+  numeq(N, C, T), 
+  N1 is N+1.
+
+% List is true if contains all sections
+all_sections(List) :- 
+  findall(Sections, section(_, Sections, _, _, _), List).
+
+% List is true if it produces all combinations of the sections (before being filtered by numeq and must_contain)
+comb(S1, List, Types, Activities) :- 
+  findall(S2, (comb_helper(S1, S2), numeq(Types, S2), must_contain(Activities, S2)), List).  
+
+comb_helper([],[]).
+comb_helper([H|T1],[H|T2]) :- 
+  comb_helper(T1,T2).
+comb_helper([_|T1],T2) :- 
+  comb_helper(T1,T2).
+
+% under_limit(S1, T, S2) is true if S2 contains every schedule that has a total time under the given time limit T
+under_limit([], _ ,[]).
+under_limit([Sections|R1], T, R2) :- 
+  sum(Sections, Sum), 
+  Sum > T, 
+  under_limit(R1, T, R2).
+under_limit([Sections|R1], T, [Sections|R2]) :- 
+  sum(Sections, Sum), 
+  Sum =< T, 
+  under_limit(R1, T, R2).
+
+% match(S, A) is true if A is a list of activities that correspond to S
+match([], []).
+match([Section|T1], [Activity|T2]) :- 
+  activity(_, Activity, _, _, _, _), 
+  section(Activity, Section, _, _, _), 
+  match(T1, T2).
+
+% valid(W, S1, S2) is true if S2 is a list of valid schedules.
+valid(_, [], []).
+valid(W, [S|T1], [S|T2]) :- 
+  match(S, A), 
+  \+ conflicts_list(S), 
+  filter_weathers(W, A, S), 
+  valid(W, T1, T2).
+valid(W, [S|T1], T2) :- 
+  match(S, A), 
+  \+ filter_weathers(W, A, S), 
+  valid(W, T1, T2).
+valid(W, [S|T1], T2) :- 
+  conflicts_list(S), 
+  valid(W, T1, T2).
+
+% True if Max is the schedule with the maximum number of sections
+find_max([Max], Max).
+find_max([H,K|T], Max) :- 
+  length(H,Length1), 
+  length(K,Length2), 
+  Length1 >= Length2, 
+  find_max([H|T], Max).
+find_max([H,K|T], Max) :- 
+  length(H,Length1), 
+  length(K,Length2), 
+  Length1 < Length2, 
+  find_max([K|T], Max).
+
+% same_num_sec(S1, Max, S2) is true if S2 contains every schedule that has the same number of sections as Max
+same_num_sec([], _, []).
+same_num_sec([S|T1], Max, [S|T2]) :- 
+  length(Max, Length1), 
+  length(S, Length2), 
+  Length1 == Length2, 
+  same_num_sec(T1, Max, T2). 
+same_num_sec([S|T1], Max, T2) :- 
+  length(Max, Length1), 
+  length(S, Length2), 
+  dif(Length1, Length2), 
+  same_num_sec(T1, Max, T2). 
+
+% Schedules is true if it is a list of valid schedules each with the maximum possible number of sections and a total time under or equal to T
+% Each schedule includes the activities specified by Types and Activities
+schedule2(W, T, Types, Activities, Schedules) :- 
+  all_sections(S1), 
+  comb(S1, S2, Types, Activities), 
+  under_limit(S2, T, S3), 
+  valid(W, S3, S4), 
+  find_max(S4, Max), 
+  same_num_sec(S4, Max, Schedules).  
+  
+  
+  
 /* Facts */
 
 % activity(Type, Name, Pop, Precip, Temp, WindSpd) is an activity with a Type and Name, where
 %  Pop, Temp, WindSpd, Precip are pairs of [min, max] values for each weather parameter
-activity("Sport", hockey,     (5,10), (5,10), (5,10), (5,10)).
-activity("Sport", football,   (1,10), (1,10), (1,10), (1,10)).
-activity("Sport", volleyball, (5,10), (5,10), (5,10), (5,10)).
-activity("Sport", soccer,     (5,10), (5,10), (5,10), (5,10)).
+activity(Sport, hockey,     (5,10), (5,10), (5,10), (5,10)).
+activity(Sport, football,   (1,10), (1,10), (1,10), (1,10)).
+activity(Sport, volleyball, (5,10), (5,10), (5,10), (5,10)).
+activity(Sport, soccer,     (5,10), (5,10), (5,10), (5,10)).
 % Examples with somewhat realistic weather conditions
-activity("Sport", indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
-activity("Sport", outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
-activity("Sport", beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
-activity("Sport", sleep, (0,100), (0,1000), (-100,100), (0,100)).
+activity(Sport, indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
+activity(Sport, outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
+activity(Sport, beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
+activity(Leisure, sleep, (0,100), (0,1000), (-100,100), (0,100)).
+activity(Leisure, picnic, (0,5), (0,1), (5,25), (0,1)).
 
 % section(ActivityName, SectionCode, Day, StartTime, EndTime) is a schedulable section for activity ActivityName,
 %  where the section has a unique SectionCode, is Day days into the future, and starts at StartTime and ends at EndTime on that day
