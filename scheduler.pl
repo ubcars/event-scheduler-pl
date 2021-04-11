@@ -4,7 +4,7 @@
 :- use_module(library(http/http_json)).
 :- use_module(library(http/json)).
 
-% Query for a schedule from interface
+% Let user interactively query for a schedule using the schedule predicate
 ischedule(Days, Activities, Forecast, Schedule) :- % TODO: Use this line for debugging; remove line when we finish project
 % ischedule(Schedule) :-
   write("Enter list of available days, in the form of days into the future (e.g. today is 0, tomorrow is 1), separated by spaces: "),
@@ -13,12 +13,32 @@ ischedule(Days, Activities, Forecast, Schedule) :- % TODO: Use this line for deb
   write("Enter list of activities, separated by spaces: "),
   flush_output(current_output),
   readln(Activities),
+  forecast_prompt(Forecast),
+  schedule(Days, Activities, Forecast, Schedule).
+
+% Let user interactively query for a schedule using the schedule2 predicate
+ischedule2(MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Forecast, Schedules) :- % TODO: Remove line when we finish project
+% ischedule2(Schedules) :-
+  write("Enter the maximum total amount of time, in hours, that you wish to spend on the activities: "),
+  flush_output(current_output),
+  readln(MaxTimeConstraint),
+  write("Enter, for each desired activity type, the minimum number of activities of that type that you wish to schedule (e.g. (1 leisure) (2 sport)): "),
+  flush_output(current_output),
+  readln(ActivityTypeConstraintsInput),
+  activity_type_constraints_format(ActivityTypeConstraintsInput, ActivityTypeConstraints),
+  write("Enter list of activities which must be included in the schedule, separated by spaces: "),
+  flush_output(current_output),
+  readln(ActivityConstraints),
+  forecast_prompt(Forecast),
+  schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules).
+
+% forecast_prompt(Forecast) prompts the user for a city and stores the forecast for the given city in Forecast
+forecast_prompt(Forecast) :-
   write("Enter city where activities will take place: "),
   flush_output(current_output),
   readln(LocationInput),
   atomic_list_concat(LocationInput, '+', Location),
-  forecast(Location, Forecast),
-  schedule(Days, Activities, Forecast, Schedule).
+  forecast(Location, Forecast).
 
 % forecast(Location, Forecast) is true if Forecast is the weather forecast for Location
 forecast(Location, Forecast) :-
@@ -67,6 +87,14 @@ weather_obj_to_term(WeatherObject, Day, weather(Day, Pop, Precip, Temp, WindSpd)
   Precip  = WeatherObject.get(precip),
   Temp    = WeatherObject.get(temp),
   WindSpd = WeatherObject.get(wind_spd).
+
+% activity_type_constraints_format(ActivityTypeConstraintsInput, ActivityTypeConstraints) is true if ActivityTypeConstraints is
+%  the list of constraints in ActivityTypeConstraintsInput but formatted to be a valid input for schedule2
+% ActivityTypeConstraintsInput should have the form ['(', 1, leisure, ')', '(', 4, sport, ')']
+% ActivityTypeConstraints      should have the form [(1, leisure), (4, sport)]
+activity_type_constraints_format([], []).
+activity_type_constraints_format(['(', N, ActivityType, ')'|RawT], [(N, ActivityType)|FormattedT]) :-
+  activity_type_constraints_format(RawT, FormattedT).
 
 % conflicts_list(SectionsList) is true if there exists a conflict in list of sections SectionsList
 conflicts_list([S1, S2|_]) :- conflicts_pair(S1, S2).
