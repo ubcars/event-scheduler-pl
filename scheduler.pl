@@ -204,7 +204,7 @@ must_contain_helper(_, []) :-
   false.
 must_contain_helper(Activity, [Section|_]) :-
   section(Activity, Section, _, _, _).
-must_contain_helper(Activity, [_|T]) :-
+must_contain_helper(Activity, [Section|T]) :-
   \+ section(Activity, Section, _, _, _),
   must_contain_helper(Activity, T).
 
