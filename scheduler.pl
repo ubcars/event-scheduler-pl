@@ -97,9 +97,14 @@ activity_type_constraints_format(['(', N, ActivityType, ')'|RawT], [(N, Activity
   activity_type_constraints_format(RawT, FormattedT).
 
 % conflicts_list(SectionsList) is true if there exists a conflict in list of sections SectionsList
-conflicts_list([S1, S2|_]) :- conflicts_pair(S1, S2).
-conflicts_list([S1, _|T]) :- conflicts_list([S1|T]).
-conflicts_list([_, S2|T]) :- conflicts_list([S2|T]).
+conflicts_list([_]) :- 
+  false.
+conflicts_list([S1, S2|_]) :- 
+  conflicts_pair(S1, S2).
+conflicts_list([S1, _|T]) :- 
+  conflicts_list([S1|T]).
+conflicts_list([_, S2|T]) :- 
+  conflicts_list([S2|T]).
 
 % conflicts_pair(Section1, Section2) is true if there exists a conflict between sections Section1 and Section2
 % This is a very rudimentary check
@@ -200,22 +205,27 @@ must_contain_helper(_, []) :-
 must_contain_helper(Activity, [Section|_]) :-
   section(Activity, Section, _, _, _).
 must_contain_helper(Activity, [_|T]) :-
+  \+ section(Activity, Section, _, _, _),
   must_contain_helper(Activity, T).
 
-% numeq(ActivityTypeConstraints, Schedule) is true if the Schedule contains at least N activities of type C
+% num_at_least(ActivityTypeConstraints, Schedule) is true if the Schedule contains at least N activities of type C
 %  for each constraint of the form (N,C) in ActivityTypeConstraints
-numeq([], _).
-numeq([(N, C)|T], S) :-
-  numeq(N1, C, S),
+num_at_least([], _).
+num_at_least([(N, C)|T], S) :-
+  num_at_least(N1, C, S),
   N1 >= N,
-  numeq(T, S).
+  num_at_least(T, S).
 
-numeq(0, _, []).
-numeq(N1, C, [H|T]) :-
+num_at_least(0, _, []).
+num_at_least(N1, C, [H|T]) :-
   activity(C, A, _, _, _, _),
   section(A, H, _, _, _),
-  numeq(N, C, T),
+  num_at_least(N, C, T),
   N1 is N+1.
+num_at_least(N1, C, [H|T]) :-
+  \+ (activity(C, A, _, _, _, _), 
+  section(A, H, _, _, _)),
+  num_at_least(N1, C, T).  
 
 % all_sections(List) is true if List is a list of all section codes
 all_sections(List) :-
@@ -224,7 +234,7 @@ all_sections(List) :-
 % comb(SectionCodes, List, ActivityTypeConstraints, ActivityConstraints) is true if List is a list of all combinations of SectionCodes
 %  where the combination satisfies the ActivityTypeConstraints and ActivityConstraints
 comb(S1, List, Types, Activities) :-
-  findall(S2, (comb_helper(S1, S2), numeq(Types, S2), must_contain(Activities, S2)), List).
+  findall(S2, (comb_helper(S1, S2), num_at_least(Types, S2), must_contain(Activities, S2)), List).
 
 comb_helper([],[]).
 comb_helper([H|T1],[H|T2]) :-
@@ -260,10 +270,18 @@ valid(W, [S|T1], [S|T2]) :-
   valid(W, T1, T2).
 valid(W, [S|T1], T2) :-
   match(S, A),
+  \+ conflicts_list(S),	
   \+ filter_weathers(W, A, S),
   valid(W, T1, T2).
 valid(W, [S|T1], T2) :-
-  conflicts_list(S),
+  match(S, A),
+  distinct(S, conflicts_list(S)),
+  filter_weathers(W, A, S),
+  valid(W, T1, T2).
+valid(W, [S|T1], T2) :-
+  match(S, A),
+  distinct(S, conflicts_list(S)),
+  \+ filter_weathers(W, A, S),
   valid(W, T1, T2).
 
 % find_max(Schedules, MaxSchedule) is true if MaxSchedule is the schedule in Schedules with the maximum number of sections
