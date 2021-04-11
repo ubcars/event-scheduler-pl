@@ -194,21 +194,30 @@ sum([H|T], S) :-
 section_duration(SectionCode, Duration) :-
   section(_, SectionCode, _, StartTime, EndTime),
   Duration is EndTime-StartTime.
+  
 
+% all_sections(List) is true if List is a list of all section codes
+all_sections(List) :-
+  findall(SectionCode, section(_, SectionCode, _, _, _), List).
+  
+% within_limit(S, T) is true if S is a schedule that has a total time within the given time limit T
+within_limit(T, S) :-
+  sum(S, Sum),
+  Sum =< T.
 
-% must_contain(Activities, Schedule) is true if the Schedule contains all desired Activities
-must_contain([], _).
-must_contain([Activity|T], Schedule) :-
-  must_contain_helper(Activity, Schedule),
-  must_contain(T, Schedule).
+% match(S, A) is true if S is a list of section codes that corresponds to list of activity names A,
+%  meaning the nth section code in S identifies a section of the nth activity in N
+match([], []).
+match([SectionCode|T1], [ActivityName|T2]) :-
+  activity(_, ActivityName, _, _, _, _),
+  section(ActivityName, SectionCode, _, _, _),
+  match(T1, T2).
 
-must_contain_helper(_, []) :-
-  false.
-must_contain_helper(Activity, [Section|_]) :-
-  section(Activity, Section, _, _, _).
-must_contain_helper(Activity, [Section|T]) :-
-  \+ section(Activity, Section, _, _, _),
-  must_contain_helper(Activity, T).
+% valid(W, S) is true if S is a schedule that is valid under weather forecast W
+valid(W, S) :-
+  match(S, A),
+  \+ conflicts_list(S),
+  filter_weathers(W, A, S).  
 
 % num_at_least(ActivityTypeConstraints, Schedule) is true if the Schedule contains at least N activities of type C
 %  for each constraint of the form (N,C) in ActivityTypeConstraints
@@ -227,64 +236,32 @@ num_at_least(N1, C, [H|T]) :-
 num_at_least(N1, C, [H|T]) :-
   \+ (activity(C, A, _, _, _, _), 
   section(A, H, _, _, _)),
-  num_at_least(N1, C, T).  
+  num_at_least(N1, C, T). 
+  
+% must_contain(Activities, Schedule) is true if the Schedule contains all desired Activities
+must_contain([], _).
+must_contain([Activity|T], Schedule) :-
+  must_contain_helper(Activity, Schedule),
+  must_contain(T, Schedule).
 
-% all_sections(List) is true if List is a list of all section codes
-all_sections(List) :-
-  findall(SectionCode, section(_, SectionCode, _, _, _), List).
+must_contain_helper(_, []) :-
+  false.
+must_contain_helper(Activity, [Section|_]) :-
+  section(Activity, Section, _, _, _).
+must_contain_helper(Activity, [Section|T]) :-
+  \+ section(Activity, Section, _, _, _),
+  must_contain_helper(Activity, T).  
 
-% comb(SectionCodes, List, ActivityTypeConstraints, ActivityConstraints) is true if List is a list of all combinations of SectionCodes
-%  where the combination satisfies the ActivityTypeConstraints and ActivityConstraints
-comb(S1, List, Types, Activities) :-
-  findall(S2, (comb_helper(S1, S2), num_at_least(Types, S2), must_contain(Activities, S2)), List).
+% comb(SectionCodes, WeatherConstraints, TimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of all combinations of SectionCodes
+%  where the combination satisfies the WeatherConstraints, TimeConstraint, ActivityTypeConstraints and ActivityConstraints
+comb(S1, Weather, Time, Types, Activities, Schedules) :-
+  findall(S2, (comb_helper(S1, S2), valid(Weather, S2), within_limit(Time, S2), num_at_least(Types, S2), must_contain(Activities, S2)), Schedules).
 
 comb_helper([],[]).
 comb_helper([H|T1],[H|T2]) :-
   comb_helper(T1,T2).
 comb_helper([_|T1],T2) :-
   comb_helper(T1,T2).
-
-% under_limit(S1, T, S2) is true if S2 contains every schedule in S1 that has a total time under the given time limit T
-under_limit([], _ ,[]).
-under_limit([Sections|R1], T, R2) :-
-  sum(Sections, Sum),
-  Sum > T,
-  under_limit(R1, T, R2).
-under_limit([Sections|R1], T, [Sections|R2]) :-
-  sum(Sections, Sum),
-  Sum =< T,
-  under_limit(R1, T, R2).
-
-% match(S, A) is true if S is a list of section codes that corresponds to list of activity names A,
-%  meaning the nth section code in S identifies a section of the nth activity in N
-match([], []).
-match([SectionCode|T1], [ActivityName|T2]) :-
-  activity(_, ActivityName, _, _, _, _),
-  section(ActivityName, SectionCode, _, _, _),
-  match(T1, T2).
-
-% valid(W, S1, S2) is true if S2 contains every schedule in S1 that is valid under weather forecast W
-valid(_, [], []).
-valid(W, [S|T1], [S|T2]) :-
-  match(S, A),
-  \+ conflicts_list(S),
-  filter_weathers(W, A, S),
-  valid(W, T1, T2).
-valid(W, [S|T1], T2) :-
-  match(S, A),
-  \+ conflicts_list(S),	
-  \+ filter_weathers(W, A, S),
-  valid(W, T1, T2).
-valid(W, [S|T1], T2) :-
-  match(S, A),
-  distinct(S, conflicts_list(S)),
-  filter_weathers(W, A, S),
-  valid(W, T1, T2).
-valid(W, [S|T1], T2) :-
-  match(S, A),
-  distinct(S, conflicts_list(S)),
-  \+ filter_weathers(W, A, S),
-  valid(W, T1, T2).
 
 % find_max(Schedules, MaxSchedule) is true if MaxSchedule is the schedule in Schedules with the maximum number of sections
 find_max([Max], Max).
@@ -320,11 +297,9 @@ same_num_sec([_|T], Max, S) :-
 % For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], Schedules).
 schedule2(W, T, Types, Activities, Schedule) :-
   all_sections(S1),
-  comb(S1, S2, Types, Activities),
-  under_limit(S2, T, S3),
-  valid(W, S3, S4),
-  find_max(S4, Max),
-  same_num_sec(S4, Max, Schedule).
+  comb(S1, W, T, Types, Activities, S2),
+  find_max(S2, Max),
+  same_num_sec(S2, Max, Schedule).
 
 
 /* Facts */
