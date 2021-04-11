@@ -297,18 +297,15 @@ find_max([H,K|T], Max) :-
   Length1 < Length2,
   find_max([K|T], Max).
 
-% same_num_sec(S1, Max, S2) is true if S2 contains every schedule in S1 that has Max number of sections
-same_num_sec([], _, []).
-same_num_sec([S|T1], Max, [S|T2]) :-
+% same_num_sec(S1, Max, S2) is true if S2 is a schedule in S1 that has Max number of sections
+same_num_sec([], _, _) :-
+  false.
+same_num_sec([S|_], Max, S) :-
   length(Max, Length1),
   length(S, Length2),
-  Length1 == Length2,
-  same_num_sec(T1, Max, T2).
-same_num_sec([S|T1], Max, T2) :-
-  length(Max, Length1),
-  length(S, Length2),
-  dif(Length1, Length2),
-  same_num_sec(T1, Max, T2).
+  Length1 == Length2.
+same_num_sec([_|T], Max, S) :-
+  same_num_sec(T, Max, S).
 
 % schedule2 outputs a list of recommended schedules based on the user's preferences.
 % schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of valid schedules, where
@@ -318,13 +315,13 @@ same_num_sec([S|T1], Max, T2) :-
 %  ActivityTypeConstraints is a list of (N, ActivityType) pairs where N is the minimum number of activities of type T that are required in the schedule, and
 %  ActivityConstraints     is a list of activities which must be included in the schedule.
 % For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], Schedules).
-schedule2(W, T, Types, Activities, Schedules) :-
+schedule2(W, T, Types, Activities, Schedule) :-
   all_sections(S1),
   comb(S1, S2, Types, Activities),
   under_limit(S2, T, S3),
   valid(W, S3, S4),
   find_max(S4, Max),
-  same_num_sec(S4, Max, Schedules).
+  same_num_sec(S4, Max, Schedule).
 
 
 /* Facts */
