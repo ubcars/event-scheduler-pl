@@ -162,7 +162,9 @@ schedule(_, [], _, _) :- writeln("No activity selected"), !, fail.
 schedule(Days, Activities, Weathers, Sections) :-
   filter_weathers(Weathers, Activities, Sections),
   sections_in_days(Sections, Days),
-  \+ conflicts_list(Sections).
+  \+ conflicts_list(Sections),
+  length(Sections, Length),
+  dif(Length, 0).
 
 % list_schedules(Days, Activities, Weathers, Schedules) is true if Schedules is the list of all valid schedules (schedules that satisfy all constraints)
 %  which can be produced under the constraints given by Days, Activities, and Weather
@@ -303,7 +305,8 @@ same_num_sec([], _, _) :-
 same_num_sec([S|_], Max, S) :-
   length(Max, Length1),
   length(S, Length2),
-  Length1 == Length2.
+  Length1 == Length2,
+  dif(Length1, 0).
 same_num_sec([_|T], Max, S) :-
   same_num_sec(T, Max, S).
 
