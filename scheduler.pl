@@ -156,8 +156,6 @@ activity_type_constraints_format(['(', N, ActivityType, ')'|RawT], [(N, Activity
   activity_type_constraints_format(RawT, FormattedT).
 
 % conflicts_list(SectionsList) is true if there exists a conflict in list of sections SectionsList
-conflicts_list([_]) :-
-  false.
 conflicts_list([S1, S2|_]) :-
   conflicts_pair(S1, S2).
 conflicts_list([S1, _|T]) :-
