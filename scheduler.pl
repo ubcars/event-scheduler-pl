@@ -309,16 +309,18 @@ same_num_sec([_|T], Max, S) :-
 %  a valid schedule is a schedule that has the maximum possible number of sections and satisfies the provided constraints:
 %  Forecast                is a list of weather terms that specifies the weather for the days under which the activities in the schedule must take place,
 %  MaxTimeConstraint       is the maximum combined duration of the activities in the schedule,
-%  ActivityTypeConstraints is a list of (N, ActivityType) pairs where N is the minimum number of activities of type T that are required in the schedule, and
+%  ActivityTypeConstraints is a list of (Num, ActivityType) pairs where Num is the minimum number of activities of type ActivityType that are required in the schedule, and
 %  ActivityConstraints     is a list of activities which must be included in the schedule.
 %  Include specifies whether the user wants unspecified activities to be included.
-% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], NO, Schedules).
-schedule2(W, T, Types, Activities, YES, Schedule) :-
+% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], n, Schedules).
+schedule2(W, T, Types, Activities, Include, Schedule) :-
+  Include == y,
   all_sections(S1),
   comb(S1, W, T, Types, Activities, S2),
   find_max(S2, Max),
   same_num_sec(S2, Max, Schedule).
-schedule2(W, T, Types, Activities, NO, Schedule) :-
+schedule2(W, T, Types, Activities, Include, Schedule) :-
+  Include == n,
   all_sections(S1),
   only_activities(Activities, S1, S2),
   comb(S2, W, T, Types, Activities, S3),
