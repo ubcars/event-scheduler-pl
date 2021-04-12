@@ -200,6 +200,23 @@ section_duration(SectionCode, Duration) :-
 all_sections(List) :-
   findall(SectionCode, section(_, SectionCode, _, _, _), List).
   
+% only_activities(A, S1, S2) is true if S2 is a schedule from S1 consisting of only activities in A
+only_activities(_, [], []).
+only_activities(A, [S|T1], [S|T2]) :- 
+  only_activities_helper(A, S), 
+  only_activities(A, T1, T2).
+only_activities(A, [S|T1], T2) :- 
+  \+ only_activities_helper(A, S), 
+  only_activities(A, T1, T2).
+
+only_activities_helper([], _) :-
+  false.
+only_activities_helper([ActivityName|_], SectionCode) :-
+  section(ActivityName, SectionCode, _, _, _).
+only_activities_helper([ActivityName|T], SectionCode) :-
+  \+ section(ActivityName, SectionCode, _, _, _),
+  only_activities_helper(T, SectionCode).   
+  
 % within_limit(S, T) is true if S is a schedule that has a total time within the given time limit T
 within_limit(T, S) :-
   sum(S, Sum),
@@ -288,18 +305,25 @@ same_num_sec([_|T], Max, S) :-
   same_num_sec(T, Max, S).
 
 % schedule2 outputs a list of recommended schedules based on the user's preferences.
-% schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of valid schedules, where
+% schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) is true if Schedules is a list of valid schedules, where
 %  a valid schedule is a schedule that has the maximum possible number of sections and satisfies the provided constraints:
 %  Forecast                is a list of weather terms that specifies the weather for the days under which the activities in the schedule must take place,
 %  MaxTimeConstraint       is the maximum combined duration of the activities in the schedule,
 %  ActivityTypeConstraints is a list of (N, ActivityType) pairs where N is the minimum number of activities of type T that are required in the schedule, and
 %  ActivityConstraints     is a list of activities which must be included in the schedule.
-% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], Schedules).
-schedule2(W, T, Types, Activities, Schedule) :-
+%  Include specifies whether the user wants unspecified activities to be included.
+% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], NO, Schedules).
+schedule2(W, T, Types, Activities, YES, Schedule) :-
   all_sections(S1),
   comb(S1, W, T, Types, Activities, S2),
   find_max(S2, Max),
   same_num_sec(S2, Max, Schedule).
+schedule2(W, T, Types, Activities, NO, Schedule) :-
+  all_sections(S1),
+  only_activities(Activities, S1, S2),
+  comb(S2, W, T, Types, Activities, S3),
+  find_max(S3, Max),
+  same_num_sec(S3, Max, Schedule).
 
 
 /* Facts */
