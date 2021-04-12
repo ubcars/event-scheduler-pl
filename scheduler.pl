@@ -315,7 +315,7 @@ schedule2(W, T, Types, Activities, Include, Schedule) :-
 /* Facts */
 
 % activity(Type, Name, Pop, Precip, Temp, WindSpd) is an activity with a Type and Name, where
-%  Pop, Temp, WindSpd, Precip are pairs of [min, max] values for each weather parameter
+%  Pop, Temp, WindSpd, Precip are pairs of (min, max) values for each weather parameter
 activity(sport, hockey,     (5,10), (5,10), (5,10), (5,10)).
 activity(sport, football,   (1,10), (1,10), (1,10), (1,10)).
 activity(sport, volleyball, (5,10), (5,10), (5,10), (5,10)).
