@@ -4,9 +4,11 @@
 :- use_module(library(http/http_json)).
 :- use_module(library(http/json)).
 
+
+/* Entry points */
+
 % Let user interactively query for a schedule using the schedule predicate
-ischedule(Days, Activities, Forecast, Schedule) :- % TODO: Use this line for debugging; remove line when we finish project
-% ischedule(Schedule) :-
+ischedule(Schedule) :-
   write("Enter list of available days, in the form of days into the future (e.g. today is 0, tomorrow is 1), separated by spaces: "),
   flush_output(current_output),
   readln(Days),
@@ -17,8 +19,7 @@ ischedule(Days, Activities, Forecast, Schedule) :- % TODO: Use this line for deb
   schedule(Days, Activities, Forecast, Schedule).
 
 % Let user interactively query for a schedule using the schedule2 predicate
-ischedule2(MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Forecast, Schedules) :- % TODO: Remove line when we finish project
-% ischedule2(Schedules) :-
+ischedule2(Schedule) :-
   write("Enter the maximum total amount of time, in hours, that you wish to spend on the activities: "),
   flush_output(current_output),
   readln(MaxTimeConstraint),
@@ -29,8 +30,58 @@ ischedule2(MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Fore
   write("Enter list of activities which must be included in the schedule, separated by spaces: "),
   flush_output(current_output),
   readln(ActivityConstraints),
+  write("Enter whether you wish to include activities aside from those you specified in your schedule (y or n): "),
+  flush_output(current_output),
+  readln([Include|_]),
   forecast_prompt(Forecast),
-  schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules).
+  schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedule).
+
+% schedule(Days, Activities, Location, Schedule) is true if Schedule is a valid schedule for doing all Activities
+%  some time during the selected Days under the forecasted weather at Location
+% Note: There must exist a weather term in Weathers corresponding to each day in Days
+schedule(_, [], _, _) :- writeln("No activity selected"), !, fail.
+schedule(Days, Activities, Weathers, Schedule) :-
+  filter_weathers(Weathers, Activities, Sections),
+  sections_in_days(Sections, Days),
+  \+ conflicts_list(Sections),
+  length(Sections, Length),
+  dif(Length, 0),
+  section_codes_to_tuples(Sections, Schedule).
+
+% schedule2 outputs a recommended schedule based on the user's preferences.
+% schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) is true if Schedules is a list of valid schedules, where
+%  a valid schedule is a schedule that has the maximum possible number of sections and satisfies the provided constraints:
+%  Forecast                is a list of weather terms that specifies the weather for the days under which the activities in the schedule must take place,
+%  MaxTimeConstraint       is the maximum combined duration of the activities in the schedule,
+%  ActivityTypeConstraints is a list of (Num, ActivityType) pairs where Num is the minimum number of activities of type ActivityType that are required in the schedule,
+%  ActivityConstraints     is a list of activities which must be included in the schedule, and
+%  Include                 is either y or n which specifies whether the user wants unspecified activities to be included.
+% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], n, Schedules).
+schedule2(W, T, Types, Activities, y, Schedule) :-
+  all_sections(S1),
+  comb(S1, W, T, Types, Activities, S2),
+  find_max(S2, Max),
+  same_num_sec(S2, Max, SectionCodes),
+  section_codes_to_tuples(SectionCodes, Schedule).
+schedule2(W, T, Types, Activities, n, Schedule) :-
+  only_activities(Activities, S1),
+  comb(S1, W, T, Types, Activities, S2),
+  find_max(S2, Max),
+  same_num_sec(S2, Max, SectionCodes),
+  section_codes_to_tuples(SectionCodes, Schedule).
+
+% list_schedules(Days, Activities, Forecast, Schedules) is true if Schedules is the list of
+%  every Schedule which can be produced by schedule(Days, Activities, Forecast, Schedule)
+list_schedules(Days, Activities, Forecast, Schedules) :-
+  findall(Schedule, schedule(Days, Activities, Forecast, Schedule), Schedules).
+
+% list_schedules2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) is true if Schedules is the list of
+%  every Schedule which can be produced by schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedule)
+list_schedules2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) :-
+  findall(Schedule, schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedule), Schedules).
+
+/* End entry points */
+
 
 % forecast_prompt(Forecast) prompts the user for a city and stores the forecast for the given city in Forecast
 forecast_prompt(Forecast) :-
@@ -167,22 +218,6 @@ filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|T1], [Section
   WindSpdMax >= WindSpd,
   filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), T1, T2).
 
-% schedule(Days, Activities, Location, Schedule) is true if Schedule is a valid schedule for doing all Activities
-%  some time during the selected Days under the forecasted weather at Location
-% Note: There must exist a weather term in Weathers corresponding to each day in Days
-schedule(_, [], _, _) :- writeln("No activity selected"), !, fail.
-schedule(Days, Activities, Weathers, Schedule) :-
-  filter_weathers(Weathers, Activities, Sections),
-  sections_in_days(Sections, Days),
-  \+ conflicts_list(Sections),
-  length(Sections, Length),
-  dif(Length, 0),
-  section_codes_to_tuples(Sections, Schedule).
-
-% list_schedules(Days, Activities, Weathers, Schedules) is true if Schedules is the list of all valid schedules (schedules that satisfy all constraints)
-%  which can be produced under the constraints given by Days, Activities, and Weather
-list_schedules(Days, Activities, Weathers, Schedules) :- findall(Sections, schedule(Days, Activities, Weathers, Sections), Schedules).
-
 % find_min(Schedules, MinSchedule) is true if MinSchedule is the schedule with the minimum total time commitment
 find_min([Min], Min).
 find_min([H,K|T], Min) :-
@@ -299,28 +334,6 @@ same_num_sec([S|_], Max, S) :-
   dif(Length1, 0).
 same_num_sec([_|T], Max, S) :-
   same_num_sec(T, Max, S).
-
-% schedule2 outputs a list of recommended schedules based on the user's preferences.
-% schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) is true if Schedules is a list of valid schedules, where
-%  a valid schedule is a schedule that has the maximum possible number of sections and satisfies the provided constraints:
-%  Forecast                is a list of weather terms that specifies the weather for the days under which the activities in the schedule must take place,
-%  MaxTimeConstraint       is the maximum combined duration of the activities in the schedule,
-%  ActivityTypeConstraints is a list of (Num, ActivityType) pairs where Num is the minimum number of activities of type ActivityType that are required in the schedule,
-%  ActivityConstraints     is a list of activities which must be included in the schedule, and
-%  Include                 is either y or n which specifies whether the user wants unspecified activities to be included.
-% For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], n, Schedules).
-schedule2(W, T, Types, Activities, y, Schedule) :-
-  all_sections(S1),
-  comb(S1, W, T, Types, Activities, S2),
-  find_max(S2, Max),
-  same_num_sec(S2, Max, SectionCodes),
-  section_codes_to_tuples(SectionCodes, Schedule).
-schedule2(W, T, Types, Activities, n, Schedule) :-
-  only_activities(Activities, S1),
-  comb(S1, W, T, Types, Activities, S2),
-  find_max(S2, Max),
-  same_num_sec(S2, Max, SectionCodes),
-  section_codes_to_tuples(SectionCodes, Schedule).
 
 
 /* Facts */
