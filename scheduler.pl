@@ -88,6 +88,18 @@ weather_obj_to_term(WeatherObject, Day, weather(Day, Pop, Precip, Temp, WindSpd)
   Temp    = WeatherObject.get(temp),
   WindSpd = WeatherObject.get(wind_spd).
 
+% section_codes_to_tuples(SectionCodes, SectionTuples) is true if SectionTuples is the list of tuples corresponding to SectionCodes,
+%  where a SectionTuple contains the exact parameters for the section(...) term identified by the corresponding SectionCode
+section_codes_to_tuples([], []).
+section_codes_to_tuples([Code|CT], [Tuple|TT]) :-
+  section_code_to_tuple(Code, Tuple),
+  section_codes_to_tuples(CT, TT).
+
+% section_code_to_tuple(SectionCode, SectionTuple) is true if SectionTuple is the tuple corresponding to the SectionCode,
+%  where SectionTuple contains the exact parameters for the section(...) term identified by SectionCode
+section_code_to_tuple(SectionCode, (ActivityName, SectionCode, Day, StartTime, EndTime)) :-
+  section(ActivityName, SectionCode, Day, StartTime, EndTime).
+
 % activity_type_constraints_format(ActivityTypeConstraintsInput, ActivityTypeConstraints) is true if ActivityTypeConstraints is
 %  the list of constraints in ActivityTypeConstraintsInput but formatted to be a valid input for schedule2
 % ActivityTypeConstraintsInput should have the form ['(', 1, leisure, ')', '(', 4, sport, ')']
@@ -97,13 +109,13 @@ activity_type_constraints_format(['(', N, ActivityType, ')'|RawT], [(N, Activity
   activity_type_constraints_format(RawT, FormattedT).
 
 % conflicts_list(SectionsList) is true if there exists a conflict in list of sections SectionsList
-conflicts_list([_]) :- 
+conflicts_list([_]) :-
   false.
-conflicts_list([S1, S2|_]) :- 
+conflicts_list([S1, S2|_]) :-
   conflicts_pair(S1, S2).
-conflicts_list([S1, _|T]) :- 
+conflicts_list([S1, _|T]) :-
   conflicts_list([S1|T]).
-conflicts_list([_, S2|T]) :- 
+conflicts_list([_, S2|T]) :-
   conflicts_list([S2|T]).
 
 % conflicts_pair(Section1, Section2) is true if there exists a conflict between sections Section1 and Section2
@@ -159,12 +171,13 @@ filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|T1], [Section
 %  some time during the selected Days under the forecasted weather at Location
 % Note: There must exist a weather term in Weathers corresponding to each day in Days
 schedule(_, [], _, _) :- writeln("No activity selected"), !, fail.
-schedule(Days, Activities, Weathers, Sections) :-
+schedule(Days, Activities, Weathers, Schedule) :-
   filter_weathers(Weathers, Activities, Sections),
   sections_in_days(Sections, Days),
   \+ conflicts_list(Sections),
   length(Sections, Length),
-  dif(Length, 0).
+  dif(Length, 0),
+  section_codes_to_tuples(Sections, Schedule).
 
 % list_schedules(Days, Activities, Weathers, Schedules) is true if Schedules is the list of all valid schedules (schedules that satisfy all constraints)
 %  which can be produced under the constraints given by Days, Activities, and Weather
@@ -194,19 +207,19 @@ sum([H|T], S) :-
 section_duration(SectionCode, Duration) :-
   section(_, SectionCode, _, StartTime, EndTime),
   Duration is EndTime-StartTime.
-  
+
 
 % all_sections(List) is true if List is a list of all section codes
 all_sections(List) :-
   findall(SectionCode, section(_, SectionCode, _, _, _), List).
-  
+
 % only_activities(A, S) is true if S is a list of SectionCode consisting of only activities in A
 only_activities([], []).
 only_activities([ActivityName|T1], S1) :-
-  findall(SectionCode, section(ActivityName, SectionCode,  _, _, _), S2), 
-  only_activities(T1, T2), 
-  append(S2,T2,S1).   
-  
+  findall(SectionCode, section(ActivityName, SectionCode,  _, _, _), S2),
+  only_activities(T1, T2),
+  append(S2,T2,S1).
+
 % within_limit(S, T) is true if S is a schedule that has a total time within the given time limit T
 within_limit(T, S) :-
   sum(S, Sum),
@@ -224,7 +237,7 @@ match([SectionCode|T1], [ActivityName|T2]) :-
 valid(W, S) :-
   match(S, A),
   \+ conflicts_list(S),
-  filter_weathers(W, A, S).  
+  filter_weathers(W, A, S).
 
 % num_at_least(ActivityTypeConstraints, Schedule) is true if the Schedule contains at least N activities of type C
 %  for each constraint of the form (N,C) in ActivityTypeConstraints
@@ -241,18 +254,16 @@ num_at_least(N1, C, [H|T]) :-
   num_at_least(N, C, T),
   N1 is N+1.
 num_at_least(N1, C, [H|T]) :-
-  \+ (activity(C, A, _, _, _, _), section(A, H, _, _, _)),
-  num_at_least(N1, C, T). 
-  
+  \+ (activity(C, A, _, _, _, _),
+  section(A, H, _, _, _)),
+  num_at_least(N1, C, T).
+
 % must_contain(Activities, Schedule) is true if the Schedule contains all desired Activities
 must_contain([], _).
-must_contain([Activity|T], Schedule) :-
-  must_contain_helper(Activity, Schedule),
-  must_contain(T, Schedule).
-
-must_contain_helper(ActivityName, Schedule) :-
+must_contain([ActivityName|T], Schedule) :-
   section(ActivityName, SectionCode, _, _, _),
-  member(SectionCode, Schedule).
+  member(SectionCode, Schedule),
+  must_contain(T, Schedule).
 
 % comb(SectionCodes, WeatherConstraints, TimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of all combinations of SectionCodes
 %  where the combination satisfies the WeatherConstraints, TimeConstraint, ActivityTypeConstraints and ActivityConstraints
@@ -294,22 +305,22 @@ same_num_sec([_|T], Max, S) :-
 %  a valid schedule is a schedule that has the maximum possible number of sections and satisfies the provided constraints:
 %  Forecast                is a list of weather terms that specifies the weather for the days under which the activities in the schedule must take place,
 %  MaxTimeConstraint       is the maximum combined duration of the activities in the schedule,
-%  ActivityTypeConstraints is a list of (Num, ActivityType) pairs where Num is the minimum number of activities of type ActivityType that are required in the schedule, and
-%  ActivityConstraints     is a list of activities which must be included in the schedule.
-%  Include specifies whether the user wants unspecified activities to be included.
+%  ActivityTypeConstraints is a list of (Num, ActivityType) pairs where Num is the minimum number of activities of type ActivityType that are required in the schedule,
+%  ActivityConstraints     is a list of activities which must be included in the schedule, and
+%  Include                 is either y or n which specifies whether the user wants unspecified activities to be included.
 % For example, schedule2([weather(5, 5, 5, 5, 5), weather(6, 6, 6, 6, 6)], 7, [(4, sport), (1, leisure)], [hockey, football, volleyball], n, Schedules).
-schedule2(W, T, Types, Activities, Include, Schedule) :-
-  Include == y,
+schedule2(W, T, Types, Activities, y, Schedule) :-
   all_sections(S1),
   comb(S1, W, T, Types, Activities, S2),
   find_max(S2, Max),
-  same_num_sec(S2, Max, Schedule).
-schedule2(W, T, Types, Activities, Include, Schedule) :-
-  Include == n,
+  same_num_sec(S2, Max, SectionCodes),
+  section_codes_to_tuples(SectionCodes, Schedule).
+schedule2(W, T, Types, Activities, n, Schedule) :-
   only_activities(Activities, S1),
   comb(S1, W, T, Types, Activities, S2),
   find_max(S2, Max),
-  same_num_sec(S2, Max, Schedule).
+  same_num_sec(S2, Max, SectionCodes),
+  section_codes_to_tuples(SectionCodes, Schedule).
 
 
 /* Facts */
