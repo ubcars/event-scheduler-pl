@@ -241,8 +241,7 @@ num_at_least(N1, C, [H|T]) :-
   num_at_least(N, C, T),
   N1 is N+1.
 num_at_least(N1, C, [H|T]) :-
-  \+ (activity(C, A, _, _, _, _), 
-  section(A, H, _, _, _)),
+  \+ (activity(C, A, _, _, _, _), section(A, H, _, _, _)),
   num_at_least(N1, C, T). 
   
 % must_contain(Activities, Schedule) is true if the Schedule contains all desired Activities
