@@ -200,22 +200,12 @@ section_duration(SectionCode, Duration) :-
 all_sections(List) :-
   findall(SectionCode, section(_, SectionCode, _, _, _), List).
   
-% only_activities(A, S1, S2) is true if S2 is a schedule from S1 consisting of only activities in A
-only_activities(_, [], []).
-only_activities(A, [S|T1], [S|T2]) :- 
-  only_activities_helper(A, S), 
-  only_activities(A, T1, T2).
-only_activities(A, [S|T1], T2) :- 
-  \+ only_activities_helper(A, S), 
-  only_activities(A, T1, T2).
-
-only_activities_helper([], _) :-
-  false.
-only_activities_helper([ActivityName|_], SectionCode) :-
-  section(ActivityName, SectionCode, _, _, _).
-only_activities_helper([ActivityName|T], SectionCode) :-
-  \+ section(ActivityName, SectionCode, _, _, _),
-  only_activities_helper(T, SectionCode).   
+% only_activities(A, S) is true if S is a list of SectionCode consisting of only activities in A
+only_activities([], []).
+only_activities([ActivityName|T1], S1) :-
+  findall(SectionCode, section(ActivityName, SectionCode,  _, _, _), S2), 
+  only_activities(T1, T2), 
+  append(S2,T2,S1).   
   
 % within_limit(S, T) is true if S is a schedule that has a total time within the given time limit T
 within_limit(T, S) :-
@@ -321,11 +311,10 @@ schedule2(W, T, Types, Activities, Include, Schedule) :-
   same_num_sec(S2, Max, Schedule).
 schedule2(W, T, Types, Activities, Include, Schedule) :-
   Include == n,
-  all_sections(S1),
-  only_activities(Activities, S1, S2),
-  comb(S2, W, T, Types, Activities, S3),
-  find_max(S3, Max),
-  same_num_sec(S3, Max, Schedule).
+  only_activities(Activities, S1),
+  comb(S1, W, T, Types, Activities, S2),
+  find_max(S2, Max),
+  same_num_sec(S2, Max, Schedule).
 
 
 /* Facts */
