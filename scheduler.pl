@@ -297,7 +297,8 @@ must_contain([ActivityName|T], Schedule) :-
 % comb(SectionCodes, WeatherConstraints, TimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of all combinations of SectionCodes
 %  where the combination satisfies the WeatherConstraints, TimeConstraint, ActivityTypeConstraints and ActivityConstraints
 comb(S1, Weather, Time, Types, Activities, Schedules) :-
-  findall(S2, (comb_helper(S1, S2), valid(Weather, S2), within_limit(Time, S2), num_at_least(Types, S2), must_contain(Activities, S2)), Schedules).
+  findall(S2, (comb_helper(S1, S2), valid(Weather, S2), within_limit(Time, S2), num_at_least(Types, S2), must_contain(Activities, S2)), S3), 
+  list_to_set(S3, Schedules).
 
 comb_helper([],[]).
 comb_helper([H|T1],[H|T2]) :-
