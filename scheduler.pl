@@ -138,11 +138,11 @@ filter_weathers([W|T], A, S) :- filter_weather(W, A, S), filter_weathers(T, A, S
 % Determines available sections based on a day's weather
 % True if only suitable sections remain
 filter_weather(_, [], []).
-filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), [Activity|R1], [Section|R2]) :-
+filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), [Activity|T1], [Section|T2]) :-
   section(Activity, Section, Day2, _, _),
   dif(Day1, Day2),
-  filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), R1, R2).
-filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|R1], [Section|R2]) :-
+  filter_weather(weather(Day1, Pop, Precip, Temp, WindSpd), T1, T2).
+filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|T1], [Section|T2]) :-
   activity(_, Activity, (PopMin,PopMax), (PrecipMin,PrecipMax), (TempMin,TempMax), (WindSpdMin,WindSpdMax)),
   section(Activity, Section, Day, _, _),
   Pop    >= PopMin,
@@ -153,7 +153,7 @@ filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), [Activity|R1], [Section
   TempMax >= Temp,
   WindSpd    >= WindSpdMin,
   WindSpdMax >= WindSpd,
-  filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), R1, R2).
+  filter_weather(weather(Day, Pop, Precip, Temp, WindSpd), T1, T2).
 
 % schedule(Days, Activities, Location, Schedule) is true if Schedule is a valid schedule for doing all Activities
 %  some time during the selected Days under the forecasted weather at Location
@@ -250,13 +250,9 @@ must_contain([Activity|T], Schedule) :-
   must_contain_helper(Activity, Schedule),
   must_contain(T, Schedule).
 
-must_contain_helper(_, []) :-
-  false.
-must_contain_helper(Activity, [Section|_]) :-
-  section(Activity, Section, _, _, _).
-must_contain_helper(Activity, [Section|T]) :-
-  \+ section(Activity, Section, _, _, _),
-  must_contain_helper(Activity, T).  
+must_contain_helper(ActivityName, Schedule) :-
+  section(ActivityName, SectionCode, _, _, _),
+  member(SectionCode, Schedule).
 
 % comb(SectionCodes, WeatherConstraints, TimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of all combinations of SectionCodes
 %  where the combination satisfies the WeatherConstraints, TimeConstraint, ActivityTypeConstraints and ActivityConstraints
