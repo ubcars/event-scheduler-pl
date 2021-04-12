@@ -348,7 +348,7 @@ activity(sport, soccer,     (5,10), (5,10), (5,10), (5,10)).
 activity(sport, indoor_ice_hockey, (0,100), (0,30), (-100,15), (0,20)).
 activity(sport, outdoor_badminton, (0,5), (0,1), (5,25), (0,1)).
 activity(sport, beach_volleyball,  (0,5), (0,1), (10,25), (0,5)).
-activity(leisure, sleep, (0,100), (0,1000), (-100,100), (0,100)).
+activity(leisure, sleep, (0,100), (0,1000), (-100,100), (0,100)). % Essentially a dummy activity that can be done under any realistic weather
 activity(leisure, picnic, (0,5), (0,1), (5,25), (0,1)).
 
 % section(ActivityName, SectionCode, Day, StartTime, EndTime) is a schedulable section for activity ActivityName,
@@ -363,15 +363,16 @@ section(soccer,     "Soccer 100",     5, 5, 6).
 % Examples with somewhat realistic weather conditions
 section(indoor_ice_hockey, "Indoor Ice Hockey 0-13-14", 0, 13, 14).
 section(indoor_ice_hockey, "Indoor Ice Hockey 0-13-15", 0, 13, 15).
-section(beach_volleyball, "Beach Volleyball 0-14-15", 0, 14, 15).
-section(beach_volleyball, "Beach Volleyball 0-14-16", 0, 14, 16).
-section(sleep, "Sleep 0-0-23", 0, 0, 23).
+section(beach_volleyball,  "Beach Volleyball 0-14-15",  0, 14, 15).
+section(beach_volleyball,  "Beach Volleyball 0-14-16",  0, 14, 16).
+section(sleep, "Sleep 0-0-1",   0,  0,  1).
+section(sleep, "Sleep 0-0-24",  0,  0, 24).
 section(sleep, "Sleep 0-12-15", 0, 12, 15).
-section(sleep, "Sleep 1-0-1", 1, 0, 1).
-section(sleep, "Sleep 1-12-15", 1, 12, 15).
+section(sleep, "Sleep 1-0-24",  1,  0, 24).
 
 
 /* Tests */
+% Note: The outputs here only show section codes for the sake of brevity
 
 % conflicts_list(["Hockey 100", "Football 200"]).     Output: false
 % conflicts_list(["Hockey 100", "Volleyball 100"]).   Output: true
@@ -393,6 +394,9 @@ section(sleep, "Sleep 1-12-15", 1, 12, 15).
 % schedule([6],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S).   Output: S = ["Hockey 200", "Football 200"]
 % schedule([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], S).                           Output: false
 % schedule([4,7], [hockey, football], [weather(4, 5, 5, 5, 5), weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5), weather(7, 5, 5, 5, 5)], S).   Output: false
+
+% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], n, S). Output: S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]
+% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], y, S). Output: S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-16", "Sleep 0-0-1"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15]
 
 % list_schedules([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], Schedules).                           Output: false
 % list_schedules([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], Schedules).   Output: Schedules = [["Hockey 100", "Football 100"]]
