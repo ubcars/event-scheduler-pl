@@ -70,14 +70,10 @@ schedule2(W, T, Types, Activities, n, Schedule) :-
   same_num_sec(S2, Max, SectionCodes),
   section_codes_to_tuples(SectionCodes, Schedule).
 
-% list_schedules(Days, Activities, Forecast, Schedules) is true if Schedules is the list of
-%  every Schedule which can be produced by schedule(Days, Activities, Forecast, Schedule)
-list_schedules(Days, Activities, Forecast, Schedules) :-
+% list_schedules(SchedulePredicate, Schedules) is true if Schedules is the list of every schedule which can be produced by SchedulePredicate
+list_schedules(schedule(Days, Activities, Forecast, _), Schedules) :-
   findall(Schedule, schedule(Days, Activities, Forecast, Schedule), Schedules).
-
-% list_schedules2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) is true if Schedules is the list of
-%  every Schedule which can be produced by schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedule)
-list_schedules2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedules) :-
+list_schedules(schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, _), Schedules) :-
   findall(Schedule, schedule2(Forecast, MaxTimeConstraint, ActivityTypeConstraints, ActivityConstraints, Include, Schedule), Schedules).
 
 /* End entry points */
@@ -398,9 +394,10 @@ section(sleep, "Sleep 1-0-24",  1,  0, 24).
 % schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], n, S). Output: S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]
 % schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], y, S). Output: S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-16", "Sleep 0-0-1"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15]
 
-% list_schedules([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], Schedules).                           Output: false
-% list_schedules([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], Schedules).   Output: Schedules = [["Hockey 100", "Football 100"]]
-% list_schedules([5,6], [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], Schedules).   Output: Schedules = [["Hockey 200", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 100", "Football 100"]]
+% list_schedules(schedule([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], S), Schedules).                           Output: []
+% list_schedules(schedule([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S), Schedules).   Output: Schedules = [["Hockey 100", "Football 100"]]
+% list_schedules(schedule([5,6], [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S), Schedules).   Output: Schedules = [["Hockey 200", "Football 200"], ["Hockey 200", "Football 100"], ["Hockey 100", "Football 200"], ["Hockey 100", "Football 100"]]
+% list_schedules(schedule2([], 4, [(1,leisure)], [sleep], n, Schedule), Schedules).                                      Output: Schedules = [["Sleep 0-0-1", "Sleep 0-12-15"], ["Sleep 0-0-1", "Sleep 0-12-15"]]
 
 % sum(["Hockey 200", "Football 200"], Sum).   Output: Sum = 4
 
