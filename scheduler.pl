@@ -136,16 +136,11 @@ weather_obj_to_term(WeatherObject, Day, weather(Day, Pop, Precip, Temp, WindSpd)
   WindSpd = WeatherObject.get(wind_spd).
 
 % section_codes_to_tuples(SectionCodes, SectionTuples) is true if SectionTuples is the list of tuples corresponding to SectionCodes,
-%  where a SectionTuple contains the exact parameters for the section(...) term identified by the corresponding SectionCode
+%  where a SectionTuple contains the exact parameters of the section(...) term identified by the SectionCode
 section_codes_to_tuples([], []).
-section_codes_to_tuples([Code|CT], [Tuple|TT]) :-
-  section_code_to_tuple(Code, Tuple),
+section_codes_to_tuples([SectionCode|CT], [(ActivityName, SectionCode, Day, StartTime, EndTime)|TT]) :-
+  section(ActivityName, SectionCode, Day, StartTime, EndTime),
   section_codes_to_tuples(CT, TT).
-
-% section_code_to_tuple(SectionCode, SectionTuple) is true if SectionTuple is the tuple corresponding to the SectionCode,
-%  where SectionTuple contains the exact parameters for the section(...) term identified by SectionCode
-section_code_to_tuple(SectionCode, (ActivityName, SectionCode, Day, StartTime, EndTime)) :-
-  section(ActivityName, SectionCode, Day, StartTime, EndTime).
 
 % activity_type_constraints_format(ActivityTypeConstraintsInput, ActivityTypeConstraints) is true if ActivityTypeConstraints is
 %  the list of constraints in ActivityTypeConstraintsInput but formatted to be a valid input for schedule2
@@ -297,7 +292,7 @@ must_contain([ActivityName|T], Schedule) :-
 % comb(SectionCodes, WeatherConstraints, TimeConstraint, ActivityTypeConstraints, ActivityConstraints, Schedules) is true if Schedules is a list of all combinations of SectionCodes
 %  where the combination satisfies the WeatherConstraints, TimeConstraint, ActivityTypeConstraints and ActivityConstraints
 comb(S1, Weather, Time, Types, Activities, Schedules) :-
-  findall(S2, (comb_helper(S1, S2), valid(Weather, S2), within_limit(Time, S2), num_at_least(Types, S2), must_contain(Activities, S2)), S3), 
+  findall(S2, (comb_helper(S1, S2), valid(Weather, S2), within_limit(Time, S2), num_at_least(Types, S2), must_contain(Activities, S2)), S3),
   list_to_set(S3, Schedules).
 
 comb_helper([],[]).
