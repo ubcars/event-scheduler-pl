@@ -385,8 +385,30 @@ section(sleep, "Sleep 1-0-24",  1,  0, 24).
 % schedule([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], S).                           Output: false
 % schedule([4,7], [hockey, football], [weather(4, 5, 5, 5, 5), weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5), weather(7, 5, 5, 5, 5)], S).   Output: false
 
-% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], n, S). Output: S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]
-% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], y, S). Output: S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-16", "Sleep 0-0-1"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]; S = ["Sleep 0-0-1", "Sleep 0-12-15]
+% Tests for Forecast constraint
+% schedule2([weather(0,0,0,101,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [], y, S).   Output: false
+% schedule2([weather(0,0,0,0,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [], y, S).     Output: S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [], y, S).    Output: S = ["Indoor Ice Hockey 0-13-14", "Beach Volleyball 0-14-15"]; S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+
+% Tests for MaxTime constraint
+% schedule2([weather(0,0,0,0,0)], 1, [], [sleep], n, S).   Output: S = ["Sleep 0-0-1"]
+% schedule2([weather(0,0,0,0,0)], 3, [], [sleep], n, S).   Output: S = ["Sleep 0-0-1"]; S = ["Sleep 0-12-15"]
+% schedule2([weather(0,0,0,0,0)], 4, [], [sleep], n, S).   Output: S = ["Sleep 0-0-1", "Sleep 0-12-15"]
+
+% Tests for ActivityType constraints
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,10,0), weather(6,0,0,10,0)], 2, [], [], y, S).                         Output: S = ["Indoor Ice Hockey 0-13-14", "Beach Volleyball 0-14-15"]; S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,10,0), weather(6,0,0,10,0)], 2, [(1,leisure)], [], y, S).              Output: S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,10,0), weather(6,0,0,10,0)], 2, [(1,leisure), (1,sport)], [], y, S).   Output: S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,10,0), weather(6,0,0,10,0)], 2, [(2,sport)], [], y, S).                Output: S = ["Indoor Ice Hockey 0-13-14", "Beach Volleyball 0-14-15"]
+
+% Tests for Activity constraints
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [], y, S).                          Output: S = ["Indoor Ice Hockey 0-13-14", "Beach Volleyball 0-14-15"]; S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [sleep], y, S).                     Output: S = ["Indoor Ice Hockey 0-13-14", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+% schedule2([weather(0,0,0,10,0), weather(5,0,0,0,0), weather(6,0,0,0,0)], 2, [], [sleep, beach_volleyball], y, S).   Output: S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]
+
+% Tests for Include constraint
+% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], n, S).   Output: S = ["Sleep 0-0-1", "Sleep 0-12-15"]
+% schedule2([weather(0,5,1,25,1), weather(5,5,1,25,1), weather(6,5,1,25,1)], 4, [(1,leisure)], [sleep], y, S).   Output: S = ["Beach Volleyball 0-14-15", "Sleep 0-0-1"]; S = ["Beach Volleyball 0-14-16", "Sleep 0-0-1"]; S = ["Sleep 0-0-1", "Sleep 0-12-15"]
 
 % list_schedules(schedule([4],   [hockey, football], [weather(4, 5, 5, 5, 5)], S), Schedules).                           Output: []
 % list_schedules(schedule([5],   [hockey, football], [weather(5, 5, 5, 5, 5), weather(6, 5, 5, 5, 5)], S), Schedules).   Output: Schedules = [["Hockey 100", "Football 100"]]
